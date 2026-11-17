@@ -1,0 +1,31 @@
+[
+  {
+    "step": "A_空库打开新建",
+    "hasH2": 1,
+    "emptyMsg": 1,
+    "fileInputs5": 5,
+    "kbsResponseStatus": null,
+    "typeErrors": [],
+    "allErrors": [],
+    "pass": true
+  },
+  {
+    "step": "B_空库配置方案页",
+    "profH2": 1,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "step": "C_空库知识库页",
+    "kbH2": 1,
+    "errors": [],
+    "pass": true
+  },
+  {
+    "step": "D_建KB后新建页",
+    "fileInputs": 5,
+    "kbRows": 1,
+    "errors": [],
+    "pass": true
+  }
+]

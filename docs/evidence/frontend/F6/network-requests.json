@@ -1,0 +1,97 @@
+[
+  {
+    "m": "GET",
+    "u": "/api/v1/tasks",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/session",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles?capability=summary",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles?capability=asr",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles?capability=vision",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles?capability=reading",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/knowledge-bases",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/session",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/session",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/knowledge-bases",
+    "s": 200
+  },
+  {
+    "m": "POST",
+    "u": "/api/v1/knowledge-bases",
+    "s": 201
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/knowledge-bases",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/session",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles?capability=summary",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles?capability=asr",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles?capability=vision",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles?capability=reading",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/knowledge-bases",
+    "s": 200
+  }
+]

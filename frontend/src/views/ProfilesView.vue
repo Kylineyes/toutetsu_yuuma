@@ -25,7 +25,7 @@ function newForm(cap) {
 const protoOptions = computed(() => (form.value.capability === 'asr' ? asrProtocols : chatProtocols))
 watch(() => form.value.capability, (c) => { form.value.protocol = c === 'asr' ? 'deepseek_asr' : 'openai_chat' })
 
-async function load() { try { profiles.value = await api.profiles() } catch (e) { err.value = e.message } }
+async function load() { try { const list = await api.profiles(); profiles.value = Array.isArray(list) ? list : [] } catch (e) { err.value = e.message } }
 function byCap(c) { return profiles.value.filter((p) => p.capability === c) }
 function validate() {
   // 温度：空=默认；否则须为 0~2 的数字
