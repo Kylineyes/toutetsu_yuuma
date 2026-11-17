@@ -19,13 +19,12 @@ onMounted(() => { load(); setInterval(load, 4000) })
   </div>
   <div v-if="err" class="card" style="color:#b91c1c">{{ err }}</div>
   <table>
-    <thead><tr><th>任务</th><th>视频</th><th>状态</th><th>阶段</th><th>进度</th><th>创建时间</th><th></th></tr></thead>
+    <thead><tr><th>任务</th><th>视频</th><th>状态</th><th>进度</th><th>创建时间</th><th></th></tr></thead>
     <tbody>
       <tr v-for="t in tasks" :key="t.id">
         <td style="font-family:monospace;font-size:12px">{{ t.id }}</td>
         <td>{{ t.filename }}</td>
         <td><span class="tag" :class="t.status">{{ t.status }}</span></td>
-        <td>{{ t.stage }}</td>
         <td>{{ t.progress }}%</td>
         <td>{{ t.created_at }}</td>
         <td>
@@ -33,7 +32,7 @@ onMounted(() => { load(); setInterval(load, 4000) })
           <button class="danger" style="margin-left:6px" @click="del(t.id)">删除</button>
         </td>
       </tr>
-      <tr v-if="!tasks.length"><td colspan="7" style="color:#94a3b8">暂无任务</td></tr>
+      <tr v-if="!tasks.length"><td colspan="6" style="color:#94a3b8">暂无任务</td></tr>
     </tbody>
   </table>
 </template>
