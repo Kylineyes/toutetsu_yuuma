@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -104,34 +105,66 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 		_ = r.DB.SetTaskFinished(taskID, "failed", truncate(e.Error(), 500))
 	}
 
+	// isDone 判断某阶段此前是否已成功完成，用于断点续跑时跳过。
+	isDone := func(stage string) bool {
+		st, _ := r.DB.StageStatus(taskID, stage)
+		return st == "done" || st == "skipped"
+	}
+	logf := func(format string, args ...any) {
+		log.Printf("[pipeline] task=%s "+format, append([]any{taskID}, args...)...)
+	}
+
 	// 1. import / video
-	_ = r.DB.StartStage(taskID, "import")
 	videoPath := task.VideoPath
-	if task.SourceType == "url" && task.VideoURL != "" {
-		vp := filepath.Join(uploadDir, "video")
-		if err := r.withRetry(func() error { return downloadFile(ctx, task.VideoURL, vp) }); err != nil {
-			fail("import", err)
+	if isDone("import") {
+		logf("跳过 import（已完成）")
+		if videoPath == "" {
+			videoPath = filepath.Join(uploadDir, "video")
+		}
+	} else {
+		_ = r.DB.StartStage(taskID, "import")
+		if task.SourceType == "url" && task.VideoURL != "" {
+			vp := filepath.Join(uploadDir, "video")
+			if err := r.withRetry(func() error { return downloadFile(ctx, task.VideoURL, vp) }); err != nil {
+				fail("import", err)
+				return
+			}
+			videoPath = vp
+			_ = r.DB.UpdateTaskVideo(taskID, vp)
+		}
+		if videoPath == "" {
+			fail("import", fmt.Errorf("没有视频源"))
 			return
 		}
-		videoPath = vp
-		_ = r.DB.UpdateTaskVideo(taskID, vp)
+		_ = r.DB.FinishStage(taskID, "import", "done", "", "")
 	}
-	if videoPath == "" {
-		fail("import", fmt.Errorf("没有视频源"))
-		return
-	}
-	_ = r.DB.FinishStage(taskID, "import", "done", "", "")
 	r.status(taskID, "running", 15, "")
 
 	// 2. audio
-	_ = r.DB.StartStage(taskID, "audio")
 	audioWav := filepath.Join(workDir, "audio.wav")
-	if err := r.withRetry(func() error { return media.ExtractAudio(ctx, videoPath, audioWav) }); err != nil {
-		fail("audio", err)
-		return
+	var dur float64
+	if isDone("audio") {
+		logf("跳过 audio（已完成）")
+		dur, _ = media.ProbeDuration(ctx, videoPath)
+		if _, statErr := os.Stat(audioWav); statErr != nil {
+			// 音频中间产物可能已被清理，则需重跑抽取。
+			logf("audio 中间文件缺失，重跑 audio 阶段")
+			_ = r.DB.StartStage(taskID, "audio")
+			if err := r.withRetry(func() error { return media.ExtractAudio(ctx, videoPath, audioWav) }); err != nil {
+				fail("audio", err)
+				return
+			}
+			_ = r.DB.FinishStage(taskID, "audio", "done", "", "")
+		}
+	} else {
+		_ = r.DB.StartStage(taskID, "audio")
+		if err := r.withRetry(func() error { return media.ExtractAudio(ctx, videoPath, audioWav) }); err != nil {
+			fail("audio", err)
+			return
+		}
+		dur, _ = media.ProbeDuration(ctx, videoPath)
+		_ = r.DB.FinishStage(taskID, "audio", "done", "", "")
 	}
-	dur, _ := media.ProbeDuration(ctx, videoPath)
-	_ = r.DB.FinishStage(taskID, "audio", "done", "", "")
 	r.status(taskID, "running", 22, "")
 
 	// uploaded subtitles
@@ -164,6 +197,14 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 	// 3. ASR (parallel chunks)
 	var asrCues []subtitle.Cue
 	needASR := task.ASRProfileID > 0 && (task.GenerateAIViaASR || (len(uploadedNative) == 0 && len(uploadedAI) == 0))
+	if isDone("asr") && needASR {
+		// 断点续跑：ASR 已完成，直接从已生成的 asr.srt 恢复字幕，不重复调用转录。
+		logf("跳过 asr（已完成），从 asr.srt 恢复")
+		if c, err := subtitle.ParseFile(filepath.Join(subsDir, "asr.srt")); err == nil {
+			asrCues = c
+		}
+		needASR = false
+	}
 	if needASR {
 		_ = r.DB.StartStage(taskID, "asr")
 		chunks, cutErr := media.SplitAudio(ctx, audioWav, workDir, dur)
@@ -217,10 +258,25 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 	var visionCues []subtitle.Cue
 	needVision := task.VisionProfileID > 0 && task.GenerateVision
 	var frames []media.Frame
-	if needVision || task.ReadingProfileID > 0 {
+	needFrames := needVision || task.ReadingProfileID > 0
+	if isDone("frame") && needFrames {
+		logf("跳过 frame（已完成）")
+		// frames 列表在内存中丢失：若后续 vision/回看仍需使用帧，则重新抽帧（幂等，直接覆盖 frames 目录）。
+		if needVision || task.ReadingProfileID > 0 {
+			frames, _ = media.ExtractFrames(ctx, videoPath, filepath.Join(workDir, "frames"), task.ScreenshotInterval, r.Cfg.MaxFrames, dur)
+		}
+	} else if needFrames {
 		_ = r.DB.StartStage(taskID, "frame")
 		frames, _ = media.ExtractFrames(ctx, videoPath, filepath.Join(workDir, "frames"), task.ScreenshotInterval, r.Cfg.MaxFrames, dur)
 		_ = r.DB.FinishStage(taskID, "frame", "done", fmt.Sprintf("%d 帧", len(frames)), "")
+	}
+	if isDone("vision") && needVision {
+		// 断点续跑：vision 已完成，从 vision.srt 恢复画面文本，不重复调用识图。
+		logf("跳过 vision（已完成），从 vision.srt 恢复")
+		if c, err := subtitle.ParseFile(filepath.Join(subsDir, "vision.srt")); err == nil {
+			visionCues = c
+		}
+		needVision = false
 	}
 	if needVision && len(frames) > 0 {
 		_ = r.DB.StartStage(taskID, "vision")
@@ -271,7 +327,17 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 	r.status(taskID, "running", 55, "")
 
 	// 6. fuse
-	_ = r.DB.StartStage(taskID, "fuse")
+	fuseDone := isDone("fuse")
+	var unifiedText string
+	if fuseDone {
+		// 断点续跑：fuse 已完成，从 fused.srt 恢复统一稿文本，不重复融合。
+		logf("跳过 fuse（已完成），从 fused.srt 恢复")
+		if c, err := subtitle.ParseFile(filepath.Join(subsDir, "fused.srt")); err == nil {
+			unifiedText = cuesToText(c)
+		}
+	} else {
+		_ = r.DB.StartStage(taskID, "fuse")
+	}
 	var sources []subtitle.Source
 	if len(uploadedNative) > 0 {
 		sources = append(sources, subtitle.Source{Kind: "native", Cues: uploadedNative})
@@ -288,12 +354,14 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 	if len(visionCues) > 0 {
 		sources = append(sources, subtitle.Source{Kind: "vision", Cues: visionCues})
 	}
-	fused := subtitle.Fuse(sources)
-	fused = subtitle.ApplyTerms(fused, r.loadTaskTerms(taskID))
-	fusedPath := filepath.Join(subsDir, "fused.srt")
-	_ = os.WriteFile(fusedPath, []byte(subtitle.FormatSRT(fused)), 0o644)
-	unifiedText := cuesToText(fused)
-	_ = r.DB.FinishStage(taskID, "fuse", "done", "", "")
+	if !fuseDone || unifiedText == "" {
+		fused := subtitle.Fuse(sources)
+		fused = subtitle.ApplyTerms(fused, r.loadTaskTerms(taskID))
+		fusedPath := filepath.Join(subsDir, "fused.srt")
+		_ = os.WriteFile(fusedPath, []byte(subtitle.FormatSRT(fused)), 0o644)
+		unifiedText = cuesToText(fused)
+		_ = r.DB.FinishStage(taskID, "fuse", "done", "", "")
+	}
 	r.status(taskID, "running", 65, "")
 
 	danmuText := ""
@@ -302,15 +370,19 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 	}
 
 	// 7. summary + knowledge
-	_ = r.DB.StartStage(taskID, "summary")
-	summaryMD, knowledgeMD, err := r.generate(ctx, task, unifiedText, danmuText, frames, workDir, int(dur), cost)
-	if err != nil {
-		fail("summary", err)
-		return
+	if isDone("summary") {
+		logf("跳过 summary（已完成），保留既有输出")
+	} else {
+		_ = r.DB.StartStage(taskID, "summary")
+		summaryMD, knowledgeMD, err := r.generate(ctx, task, unifiedText, danmuText, frames, workDir, int(dur), cost)
+		if err != nil {
+			fail("summary", err)
+			return
+		}
+		_ = os.WriteFile(filepath.Join(outDir, "summary.md"), []byte(summaryMD), 0o644)
+		_ = os.WriteFile(filepath.Join(outDir, "knowledge.md"), []byte(knowledgeMD), 0o644)
+		_ = r.DB.FinishStage(taskID, "summary", "done", "", "")
 	}
-	_ = os.WriteFile(filepath.Join(outDir, "summary.md"), []byte(summaryMD), 0o644)
-	_ = os.WriteFile(filepath.Join(outDir, "knowledge.md"), []byte(knowledgeMD), 0o644)
-	_ = r.DB.FinishStage(taskID, "summary", "done", "", "")
 
 	cj, _ := json.Marshal(cost)
 	_ = r.DB.UpdateTaskCost(taskID, string(cj))

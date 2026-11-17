@@ -183,13 +183,14 @@ func (a *API) retryTask(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "not found")
 		return
 	}
-	_ = a.DB.DeleteTaskStages(id)
+	// 断点续跑：保留已完成(done/skipped)阶段，仅重置失败/未完成阶段，重跑时跳过已完成阶段。
+	kept, _ := a.DB.ResetNonDoneStages(id)
 	if err := a.DB.UpdateTaskStatus(id, "pending", 0, ""); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
 	a.Worker.Enqueue(id)
-	writeJSON(w, 200, map[string]string{"status": "queued"})
+	writeJSON(w, 200, map[string]any{"status": "queued", "resumed_from": kept})
 }
 
 // cleanupTaskCache deletes the task's temporary intermediates; only when paused/failed/done.
