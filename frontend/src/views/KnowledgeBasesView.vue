@@ -35,6 +35,10 @@ async function upload(kbId) {
     versions.value[kbId] = await api.kbVersions(kbId)
   } catch (e) { err.value = e.message }
 }
+async function delVersion(kb, v) {
+  if (!confirm('删除版本 v' + v.version + '？仅未被任务引用的旧版本可删。')) return
+  try { await api.deleteKBVersion(kb.id, v.version); versions.value[kb.id] = await api.kbVersions(kb.id); await load() } catch (e) { err.value = e.message }
+}
 onMounted(load)
 </script>
 
@@ -61,11 +65,13 @@ onMounted(load)
       </div>
     </div>
     <table v-if="versions[kb.id]">
-      <thead><tr><th>版本</th><th>文件</th><th>术语数</th><th>sha256</th><th>时间</th></tr></thead>
+      <thead><tr><th>版本</th><th>文件</th><th>术语数</th><th>大小</th><th>sha256</th><th>时间</th><th></th></tr></thead>
       <tbody>
         <tr v-for="v in versions[kb.id]" :key="v.id">
           <td>v{{ v.version }}</td><td>{{ v.file_name }}</td><td>{{ v.term_count }}</td>
+          <td>{{ v.size_bytes }} B</td>
           <td style="font-family:monospace;font-size:11px">{{ (v.sha256||'').slice(0,16) }}…</td><td>{{ v.created_at }}</td>
+          <td><button class="danger" @click="delVersion(kb, v)">删除</button></td>
         </tr>
       </tbody>
     </table>

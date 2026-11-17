@@ -1,14 +1,12 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import { onMounted } from 'vue'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { api } from './api.js'
 
-onMounted(async () => {
-  try {
-    const s = await api.getSettings()
-    if (s.api_token) localStorage.setItem('api_token', s.api_token)
-  } catch (e) { /* ignore */ }
-})
+const router = useRouter()
+async function logout() {
+  try { await api.logout() } catch (e) {}
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -21,8 +19,8 @@ onMounted(async () => {
         <RouterLink to="/tasks/new">新建任务</RouterLink>
         <RouterLink to="/profiles">配置方案</RouterLink>
         <RouterLink to="/knowledge-bases">知识库</RouterLink>
-        <RouterLink to="/settings">设置</RouterLink>
       </nav>
+      <button class="ghost" style="margin-top:16px;width:100%" @click="logout">退出登录</button>
     </aside>
     <main class="content">
       <RouterView />
@@ -56,5 +54,7 @@ label.fld { display: flex; flex-direction: column; gap: 4px; font-size: 13px; co
 .tag.done { background: #dcfce7; color: #166534; }
 .tag.failed { background: #fee2e2; color: #991b1b; }
 .tag.running { background: #dbeafe; color: #1e40af; }
+.tag.pending { background: #f1f5f9; color: #334155; }
+.tag.skipped { background: #fef9c3; color: #854d0e; }
 pre.md { white-space: pre-wrap; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
 </style>

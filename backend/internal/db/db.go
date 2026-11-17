@@ -19,24 +19,27 @@ func Open(path string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sqldb.SetMaxOpenConns(1) // sqlite: single writer, avoid lock contention
+	sqldb.SetMaxOpenConns(1)
 	if err := sqldb.Ping(); err != nil {
 		return nil, err
 	}
 	return &DB{sqldb}, nil
 }
 
-// Migrate creates all tables if they do not exist.
+// Migrate creates all tables and indexes if they do not exist.
 func (d *DB) Migrate() error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS profiles (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			capability TEXT NOT NULL,
+			protocol TEXT NOT NULL DEFAULT 'openai_chat',
 			name TEXT NOT NULL,
 			base_url TEXT NOT NULL,
 			api_key TEXT NOT NULL,
 			model TEXT NOT NULL,
-			extra TEXT NOT NULL DEFAULT '',
+			temperature REAL,
+			timeout_seconds INTEGER NOT NULL DEFAULT 180,
+			extra TEXT NOT NULL DEFAULT '{}',
 			created_at TEXT NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS knowledge_bases (
@@ -51,15 +54,15 @@ func (d *DB) Migrate() error {
 			version INTEGER NOT NULL,
 			dir_path TEXT NOT NULL,
 			file_name TEXT NOT NULL,
-			term_count INTEGER NOT NULL DEFAULT 0,
 			sha256 TEXT NOT NULL DEFAULT '',
+			term_count INTEGER NOT NULL DEFAULT 0,
+			size_bytes INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL,
 			UNIQUE(kb_id, version)
 		)`,
 		`CREATE TABLE IF NOT EXISTS tasks (
 			id TEXT PRIMARY KEY,
 			status TEXT NOT NULL,
-			stage TEXT NOT NULL DEFAULT '',
 			progress INTEGER NOT NULL DEFAULT 0,
 			error TEXT NOT NULL DEFAULT '',
 			source_type TEXT NOT NULL DEFAULT 'file',
@@ -77,8 +80,23 @@ func (d *DB) Migrate() error {
 			generate_ai_subtitle_via_asr INTEGER NOT NULL DEFAULT 0,
 			generate_vision_subtitle INTEGER NOT NULL DEFAULT 0,
 			cost_summary TEXT NOT NULL DEFAULT '{}',
+			started_at TEXT NOT NULL DEFAULT '',
+			finished_at TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS task_stages (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			task_id TEXT NOT NULL,
+			stage TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'pending',
+			progress INTEGER NOT NULL DEFAULT 0,
+			started_at TEXT NOT NULL DEFAULT '',
+			finished_at TEXT NOT NULL DEFAULT '',
+			duration_ms INTEGER NOT NULL DEFAULT 0,
+			message TEXT NOT NULL DEFAULT '',
+			error TEXT NOT NULL DEFAULT '',
+			UNIQUE(task_id, stage)
 		)`,
 		`CREATE TABLE IF NOT EXISTS task_subtitles (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,10 +113,12 @@ func (d *DB) Migrate() error {
 			version INTEGER NOT NULL,
 			priority INTEGER NOT NULL DEFAULT 0
 		)`,
-		`CREATE TABLE IF NOT EXISTS settings (
-			key TEXT PRIMARY KEY,
-			value TEXT NOT NULL
-		)`,
+		// indexes
+		`CREATE INDEX IF NOT EXISTS idx_task_subtitles_task ON task_subtitles(task_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_task_kb_task ON task_knowledge_bases(task_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_task_stages_task ON task_stages(task_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_kb_versions_kb ON knowledge_base_versions(kb_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)`,
 	}
 	for _, s := range stmts {
 		if _, err := d.Exec(s); err != nil {
@@ -113,14 +133,17 @@ func now() string { return time.Now().Format(time.RFC3339) }
 // ---------------- models ----------------
 
 type Profile struct {
-	ID         int64  `json:"id"`
-	Capability string `json:"capability"`
-	Name       string `json:"name"`
-	BaseURL    string `json:"base_url"`
-	APIKey     string `json:"api_key,omitempty"`
-	Model      string `json:"model"`
-	Extra      string `json:"extra,omitempty"`
-	CreatedAt  string `json:"created_at"`
+	ID             int64    `json:"id"`
+	Capability     string   `json:"capability"`
+	Protocol       string   `json:"protocol"`
+	Name           string   `json:"name"`
+	BaseURL        string   `json:"base_url"`
+	APIKey         string   `json:"api_key,omitempty"`
+	Model          string   `json:"model"`
+	Temperature    *float64 `json:"temperature"`
+	TimeoutSeconds int      `json:"timeout_seconds"`
+	Extra          string   `json:"extra,omitempty"`
+	CreatedAt      string   `json:"created_at"`
 }
 
 type KnowledgeBase struct {
@@ -136,15 +159,15 @@ type KBVersion struct {
 	Version   int    `json:"version"`
 	DirPath   string `json:"dir_path"`
 	FileName  string `json:"file_name"`
-	TermCount int    `json:"term_count"`
 	SHA256    string `json:"sha256"`
+	TermCount int    `json:"term_count"`
+	SizeBytes int64  `json:"size_bytes"`
 	CreatedAt string `json:"created_at"`
 }
 
 type Task struct {
 	ID                 string `json:"id"`
 	Status             string `json:"status"`
-	Stage              string `json:"stage"`
 	Progress           int    `json:"progress"`
 	Error              string `json:"error"`
 	SourceType         string `json:"source_type"`
@@ -162,8 +185,23 @@ type Task struct {
 	GenerateAIViaASR   bool   `json:"generate_ai_subtitle_via_asr"`
 	GenerateVision     bool   `json:"generate_vision_subtitle"`
 	CostSummary        string `json:"cost_summary"`
+	StartedAt          string `json:"started_at"`
+	FinishedAt         string `json:"finished_at"`
 	CreatedAt          string `json:"created_at"`
 	UpdatedAt          string `json:"updated_at"`
+}
+
+type TaskStage struct {
+	ID         int64  `json:"id"`
+	TaskID     string `json:"task_id"`
+	Stage      string `json:"stage"`
+	Status     string `json:"status"`
+	Progress   int    `json:"progress"`
+	StartedAt  string `json:"started_at"`
+	FinishedAt string `json:"finished_at"`
+	DurationMs int64  `json:"duration_ms"`
+	Message    string `json:"message"`
+	Error      string `json:"error"`
 }
 
 type TaskSubtitle struct {

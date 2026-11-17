@@ -28,7 +28,7 @@ func (a *API) createTask(w http.ResponseWriter, r *http.Request) {
 	task := &db.Task{
 		ID:                 id,
 		Status:             "pending",
-		Stage:              "queued",
+		Progress:           0,
 		SourceType:         "file",
 		SummaryPreference:  r.FormValue("summary_preference"),
 		ScreenshotMode:     defaultStr(r.FormValue("screenshot_mode"), "simple"),
@@ -43,7 +43,6 @@ func (a *API) createTask(w http.ResponseWriter, r *http.Request) {
 		CostSummary:        "{}",
 	}
 
-	// video: url or file
 	videoURL := strings.TrimSpace(r.FormValue("video_url"))
 	if videoURL != "" {
 		task.SourceType = "url"
@@ -69,7 +68,6 @@ func (a *API) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// subtitle slots
 	for _, kind := range []string{"native", "ai", "vision", "danmu"} {
 		if f, hdr, err := r.FormFile("subtitle_" + kind); err == nil {
 			name := filepath.Base(hdr.Filename)
@@ -81,7 +79,7 @@ func (a *API) createTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// knowledge bases: repeated "kb" = "id:version", order = priority
+	// knowledge bases: repeated "kb" = "id:version"; priority starts at 1 in selection order
 	for i, kv := range r.MultipartForm.Value["kb"] {
 		parts := strings.SplitN(kv, ":", 2)
 		if len(parts) != 2 {
@@ -90,7 +88,7 @@ func (a *API) createTask(w http.ResponseWriter, r *http.Request) {
 		kbID, _ := strconv.ParseInt(parts[0], 10, 64)
 		ver, _ := strconv.Atoi(parts[1])
 		if kbID > 0 && ver > 0 {
-			_ = a.DB.AddTaskKB(&db.TaskKB{KBID: kbID, Version: ver, Priority: i}, id)
+			_ = a.DB.AddTaskKB(&db.TaskKB{KBID: kbID, Version: ver, Priority: i + 1}, id)
 		}
 	}
 
@@ -116,6 +114,15 @@ func (a *API) getTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, t)
 }
 
+func (a *API) taskStages(w http.ResponseWriter, r *http.Request) {
+	st, err := a.DB.ListStages(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, st)
+}
+
 func (a *API) taskResult(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	t, err := a.DB.GetTask(id)
@@ -126,16 +133,18 @@ func (a *API) taskResult(w http.ResponseWriter, r *http.Request) {
 	outDir := filepath.Join(a.Cfg.DataDir, "task", id, "output")
 	subs, _ := a.DB.ListTaskSubtitles(id)
 	kbs, _ := a.DB.ListTaskKBs(id)
+	stages, _ := a.DB.ListStages(id)
 	var cost map[string]any
 	_ = json.Unmarshal([]byte(t.CostSummary), &cost)
 
 	writeJSON(w, 200, map[string]any{
-		"task":         t,
-		"cost":         cost,
-		"subtitles":    subs,
-		"knowledge_bases": kbs,
-		"summary_md":   readFileStr(filepath.Join(outDir, "summary.md")),
-		"knowledge_md": readFileStr(filepath.Join(outDir, "knowledge.md")),
+		"task":             t,
+		"cost":             cost,
+		"subtitles":        subs,
+		"knowledge_bases":  kbs,
+		"stages":           stages,
+		"summary_md":       readFileStr(filepath.Join(outDir, "summary.md")),
+		"knowledge_md":     readFileStr(filepath.Join(outDir, "knowledge.md")),
 	})
 }
 
@@ -165,7 +174,8 @@ func (a *API) retryTask(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "not found")
 		return
 	}
-	if err := a.DB.UpdateTaskState(id, "pending", "queued", 0, ""); err != nil {
+	_ = a.DB.DeleteTaskStages(id)
+	if err := a.DB.UpdateTaskStatus(id, "pending", 0, ""); err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
@@ -173,17 +183,7 @@ func (a *API) retryTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]string{"status": "queued"})
 }
 
-func (a *API) deleteTask(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if err := a.DB.DeleteTask(id); err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	writeJSON(w, 200, map[string]string{"status": "ok"})
-}
-
-// cleanupTaskCache deletes the task's temporary intermediates under TMP_DIR.
-// Only allowed when the task is paused / failed / done (not queued or running).
+// cleanupTaskCache deletes the task's temporary intermediates; only when paused/failed/done.
 func (a *API) cleanupTaskCache(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	t, err := a.DB.GetTask(id)
@@ -193,7 +193,6 @@ func (a *API) cleanupTaskCache(w http.ResponseWriter, r *http.Request) {
 	}
 	switch t.Status {
 	case "done", "failed", "paused":
-		// ok
 	default:
 		writeErr(w, 400, "任务状态为 "+t.Status+"，仅 paused/failed/done 可清理缓存")
 		return
@@ -204,6 +203,14 @@ func (a *API) cleanupTaskCache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]string{"status": "ok", "cleaned": dir})
+}
+
+func (a *API) deleteTask(w http.ResponseWriter, r *http.Request) {
+	if err := a.DB.DeleteTask(r.PathValue("id")); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]string{"status": "ok"})
 }
 
 func saveUpload(src io.Reader, dst string) error {
