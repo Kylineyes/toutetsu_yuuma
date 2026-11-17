@@ -3,9 +3,14 @@ services:
     build: ./backend
     restart: unless-stopped
     environment:
+      HOST: "0.0.0.0"
       PORT: "8080"
       DATA_DIR: /data
       TMP_DIR: "${TMP_DIR:-/tmp}"
+      PASSWORD: "${PASSWORD:-}"
+      API_TOKEN: "${API_TOKEN:-}"
+      SESSION_SECRET: "${SESSION_SECRET:-}"
+      MAX_GO_CONCURRENCY: "${MAX_GO_CONCURRENCY:-4}"
       DEFAULT_SCREENSHOT_INTERVAL: "${DEFAULT_SCREENSHOT_INTERVAL:-60}"
       MAX_FRAMES: "${MAX_FRAMES:-120}"
       TZ: "${TZ:-Asia/Shanghai}"

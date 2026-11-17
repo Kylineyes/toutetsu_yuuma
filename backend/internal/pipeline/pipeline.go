@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Kylineyes/toutetsu_yuuma/backend/internal/config"
@@ -19,13 +20,11 @@ import (
 	"github.com/Kylineyes/toutetsu_yuuma/backend/internal/subtitle"
 )
 
-// Runner executes the analysis pipeline for one task.
 type Runner struct {
 	DB  *db.DB
 	Cfg *config.Config
 }
 
-// Cost accumulates usage for display (never used to abort).
 type Cost struct {
 	ASRSeconds       float64 `json:"asr_seconds"`
 	VisionImages     int     `json:"vision_images"`
@@ -33,19 +32,8 @@ type Cost struct {
 	CompletionTokens int     `json:"completion_tokens"`
 }
 
-func (r *Runner) setState(id, status, stage string, progress int, errMsg string) {
-	_ = r.DB.UpdateTaskState(id, status, stage, progress, errMsg)
-}
-
-func (r *Runner) fail(id, stage string, err error) {
-	r.setState(id, "failed", stage, 0, truncateMsg(err.Error()))
-}
-
-func truncateMsg(s string) string {
-	if len(s) > 500 {
-		return s[:500]
-	}
-	return s
+func (r *Runner) status(id, status string, progress int, errMsg string) {
+	_ = r.DB.UpdateTaskStatus(id, status, progress, errMsg)
 }
 
 func (r *Runner) clientFor(profileID int64) (*deepseek.Client, error) {
@@ -56,7 +44,7 @@ func (r *Runner) clientFor(profileID int64) (*deepseek.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("读取方案失败: %v", err)
 	}
-	return deepseek.New(p.BaseURL, p.APIKey, p.Model), nil
+	return deepseek.New(p.BaseURL, p.APIKey, p.Model, p.Protocol, p.Temperature, p.TimeoutSeconds), nil
 }
 
 func (r *Runner) withRetry(fn func() error) error {
@@ -70,6 +58,24 @@ func (r *Runner) withRetry(fn func() error) error {
 	return err
 }
 
+func runConcurrently(n, limit int, fn func(i int)) {
+	if limit < 1 {
+		limit = 1
+	}
+	sem := make(chan struct{}, limit)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int) {
+			defer wg.Done()
+			defer func() { recover(); <-sem }()
+			fn(i)
+		}(i)
+	}
+	wg.Wait()
+}
+
 // Run processes one task synchronously (called from a worker goroutine).
 func (r *Runner) Run(ctx context.Context, taskID string) {
 	task, err := r.DB.GetTask(taskID)
@@ -78,7 +84,7 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			r.setState(taskID, "failed", "panic", 0, fmt.Sprintf("panic: %v", rec))
+			_ = r.DB.SetTaskFinished(taskID, "failed", fmt.Sprintf("panic: %v", rec))
 		}
 	}()
 
@@ -91,32 +97,42 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 		_ = os.MkdirAll(d, 0o755)
 	}
 
-	r.setState(taskID, "running", "download", 5, "")
+	_ = r.DB.SetTaskStarted(taskID)
 
-	// 1. video
+	fail := func(stage string, e error) {
+		_ = r.DB.FinishStage(taskID, stage, "failed", "", e.Error())
+		_ = r.DB.SetTaskFinished(taskID, "failed", truncate(e.Error(), 500))
+	}
+
+	// 1. import / video
+	_ = r.DB.StartStage(taskID, "import")
 	videoPath := task.VideoPath
 	if task.SourceType == "url" && task.VideoURL != "" {
 		vp := filepath.Join(uploadDir, "video")
 		if err := r.withRetry(func() error { return downloadFile(ctx, task.VideoURL, vp) }); err != nil {
-			r.fail(taskID, "download", err)
+			fail("import", err)
 			return
 		}
 		videoPath = vp
 		_ = r.DB.UpdateTaskVideo(taskID, vp)
 	}
 	if videoPath == "" {
-		r.fail(taskID, "video", fmt.Errorf("没有视频源"))
+		fail("import", fmt.Errorf("没有视频源"))
 		return
 	}
+	_ = r.DB.FinishStage(taskID, "import", "done", "", "")
+	r.status(taskID, "running", 15, "")
 
 	// 2. audio
-	r.setState(taskID, "running", "audio", 15, "")
+	_ = r.DB.StartStage(taskID, "audio")
 	audioWav := filepath.Join(workDir, "audio.wav")
 	if err := r.withRetry(func() error { return media.ExtractAudio(ctx, videoPath, audioWav) }); err != nil {
-		r.fail(taskID, "audio", err)
+		fail("audio", err)
 		return
 	}
 	dur, _ := media.ProbeDuration(ctx, videoPath)
+	_ = r.DB.FinishStage(taskID, "audio", "done", "", "")
+	r.status(taskID, "running", 22, "")
 
 	// uploaded subtitles
 	subs, _ := r.DB.ListTaskSubtitles(taskID)
@@ -145,34 +161,44 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 
 	cost := &Cost{}
 
-	// 3. ASR
+	// 3. ASR (parallel chunks)
 	var asrCues []subtitle.Cue
 	needASR := task.ASRProfileID > 0 && (task.GenerateAIViaASR || (len(uploadedNative) == 0 && len(uploadedAI) == 0))
 	if needASR {
-		r.setState(taskID, "running", "asr", 30, "")
+		_ = r.DB.StartStage(taskID, "asr")
 		chunks, cutErr := media.SplitAudio(ctx, audioWav, workDir, dur)
-		if cutErr == nil {
+		if cutErr == nil && len(chunks) > 0 {
 			asrClient, e2 := r.clientFor(task.ASRProfileID)
 			if e2 != nil {
-				r.fail(taskID, "asr", e2)
+				fail("asr", e2)
 				return
 			}
-			for _, ch := range chunks {
+			results := make([]string, len(chunks))
+			var done int32
+			var mu sync.Mutex
+			runConcurrently(len(chunks), r.Cfg.MaxConcurrency, func(i int) {
 				var res *deepseek.ASRResult
 				e := r.withRetry(func() error {
-					rr, err := asrClient.Transcribe(ctx, ch.Path)
+					rr, err := asrClient.Transcribe(ctx, chunks[i].Path)
 					if err != nil {
 						return err
 					}
 					res = rr
 					return nil
 				})
-				if e != nil || res == nil {
-					continue
+				if e == nil && res != nil && strings.TrimSpace(res.Text) != "" {
+					results[i] = res.Text
 				}
-				if strings.TrimSpace(res.Text) != "" {
-					asrCues = append(asrCues, subtitle.Cue{Start: ch.Start, End: ch.End, Text: res.Text})
-					cost.ASRSeconds += (ch.End - ch.Start)
+				mu.Lock()
+				done++
+				d := int(done)
+				mu.Unlock()
+				_ = r.DB.UpdateStageProgress(taskID, "asr", d*100/len(chunks), fmt.Sprintf("分片 %d/%d", d, len(chunks)))
+			})
+			for i, txt := range results {
+				if txt != "" {
+					asrCues = append(asrCues, subtitle.Cue{Start: chunks[i].Start, End: chunks[i].End, Text: txt})
+					cost.ASRSeconds += (chunks[i].End - chunks[i].Start)
 				}
 			}
 			if len(asrCues) > 0 {
@@ -180,52 +206,72 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 				_ = os.WriteFile(p, []byte(subtitle.FormatSRT(asrCues)), 0o644)
 				_ = r.DB.AddTaskSubtitle(&db.TaskSubtitle{TaskID: taskID, Kind: "asr", OrigName: "asr.srt", StoredPath: p, Generated: true})
 			}
+			_ = r.DB.FinishStage(taskID, "asr", "done", "", "")
+		} else {
+			_ = r.DB.FinishStage(taskID, "asr", "skipped", "无可切分音频", "")
 		}
 	}
+	r.status(taskID, "running", 45, "")
 
-	// 4/5. frames + vision subtitle
+	// 4/5. frames + vision (parallel)
 	var visionCues []subtitle.Cue
 	needVision := task.VisionProfileID > 0 && task.GenerateVision
 	var frames []media.Frame
-	if (needVision || task.ReadingProfileID > 0) && task.ScreenshotMode != "off" {
-		r.setState(taskID, "running", "frame", 45, "")
+	if needVision || task.ReadingProfileID > 0 {
+		_ = r.DB.StartStage(taskID, "frame")
 		frames, _ = media.ExtractFrames(ctx, videoPath, filepath.Join(workDir, "frames"), task.ScreenshotInterval, r.Cfg.MaxFrames, dur)
+		_ = r.DB.FinishStage(taskID, "frame", "done", fmt.Sprintf("%d 帧", len(frames)), "")
 	}
 	if needVision && len(frames) > 0 {
-		r.setState(taskID, "running", "vision", 52, "")
+		_ = r.DB.StartStage(taskID, "vision")
 		vClient, e := r.clientFor(task.VisionProfileID)
-		if e == nil {
-			for _, fr := range frames {
-				var res *deepseek.ChatResult
-				er := r.withRetry(func() error {
-					rr, err := vClient.Vision(ctx, "识别这张视频截图中的字幕/画面文字与关键信息，只输出文字内容；若无文字则输出空。", []string{fr.Path})
-					if err != nil {
-						return err
-					}
-					res = rr
-					return nil
-				})
-				if er != nil || res == nil {
-					continue
+		if e != nil {
+			fail("vision", e)
+			return
+		}
+		frameText := make([]string, len(frames))
+		var done int32
+		var mu sync.Mutex
+		runConcurrently(len(frames), r.Cfg.MaxConcurrency, func(i int) {
+			var res *deepseek.ChatResult
+			er := r.withRetry(func() error {
+				rr, err := vClient.Vision(ctx, "识别这张视频截图中的字幕/画面文字与关键信息，只输出文字内容；若无文字则输出空。", []string{frames[i].Path})
+				if err != nil {
+					return err
+				}
+				res = rr
+				return nil
+			})
+			if er == nil && res != nil {
+				mu.Lock()
+				if strings.TrimSpace(res.Text) != "" && strings.TrimSpace(res.Text) != "空" {
+					frameText[i] = res.Text
 				}
 				cost.VisionImages++
 				cost.PromptTokens += res.PromptTokens
 				cost.CompletionTokens += res.CompletionTokens
-				txt := strings.TrimSpace(res.Text)
-				if txt != "" && txt != "空" {
-					visionCues = append(visionCues, subtitle.Cue{Start: fr.Time, End: fr.Time + float64(task.ScreenshotInterval), Text: txt})
-				}
+				done++
+				d := int(done)
+				mu.Unlock()
+				_ = r.DB.UpdateStageProgress(taskID, "vision", d*100/len(frames), fmt.Sprintf("识图 %d/%d 帧", d, len(frames)))
 			}
-			if len(visionCues) > 0 {
-				p := filepath.Join(subsDir, "vision.srt")
-				_ = os.WriteFile(p, []byte(subtitle.FormatSRT(visionCues)), 0o644)
-				_ = r.DB.AddTaskSubtitle(&db.TaskSubtitle{TaskID: taskID, Kind: "vision", OrigName: "vision.srt", StoredPath: p, Generated: true})
+		})
+		for i, txt := range frameText {
+			if txt != "" {
+				visionCues = append(visionCues, subtitle.Cue{Start: frames[i].Time, End: frames[i].Time + float64(task.ScreenshotInterval), Text: txt})
 			}
 		}
+		if len(visionCues) > 0 {
+			p := filepath.Join(subsDir, "vision.srt")
+			_ = os.WriteFile(p, []byte(subtitle.FormatSRT(visionCues)), 0o644)
+			_ = r.DB.AddTaskSubtitle(&db.TaskSubtitle{TaskID: taskID, Kind: "vision", OrigName: "vision.srt", StoredPath: p, Generated: true})
+		}
+		_ = r.DB.FinishStage(taskID, "vision", "done", "", "")
 	}
+	r.status(taskID, "running", 55, "")
 
 	// 6. fuse
-	r.setState(taskID, "running", "fuse", 65, "")
+	_ = r.DB.StartStage(taskID, "fuse")
 	var sources []subtitle.Source
 	if len(uploadedNative) > 0 {
 		sources = append(sources, subtitle.Source{Kind: "native", Cues: uploadedNative})
@@ -244,40 +290,42 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 	}
 	fused := subtitle.Fuse(sources)
 	fused = subtitle.ApplyTerms(fused, r.loadTaskTerms(taskID))
-
 	fusedPath := filepath.Join(subsDir, "fused.srt")
 	_ = os.WriteFile(fusedPath, []byte(subtitle.FormatSRT(fused)), 0o644)
 	unifiedText := cuesToText(fused)
+	_ = r.DB.FinishStage(taskID, "fuse", "done", "", "")
+	r.status(taskID, "running", 65, "")
 
 	danmuText := ""
 	if len(danmuRaw) > 0 {
 		danmuText = SummarizeDanmu(CleanDanmu(danmuRaw), 200)
 	}
 
-	// 7. summary + knowledge (T rounds)
-	r.setState(taskID, "running", "summary", 75, "")
+	// 7. summary + knowledge
+	_ = r.DB.StartStage(taskID, "summary")
 	summaryMD, knowledgeMD, err := r.generate(ctx, task, unifiedText, danmuText, frames, workDir, int(dur), cost)
 	if err != nil {
-		r.fail(taskID, "summary", err)
+		fail("summary", err)
 		return
 	}
 	_ = os.WriteFile(filepath.Join(outDir, "summary.md"), []byte(summaryMD), 0o644)
 	_ = os.WriteFile(filepath.Join(outDir, "knowledge.md"), []byte(knowledgeMD), 0o644)
+	_ = r.DB.FinishStage(taskID, "summary", "done", "", "")
 
 	cj, _ := json.Marshal(cost)
 	_ = r.DB.UpdateTaskCost(taskID, string(cj))
-	r.setState(taskID, "done", "done", 100, "")
+	_ = r.DB.SetTaskFinished(taskID, "done", "")
 }
 
 func (r *Runner) loadTaskTerms(taskID string) []subtitle.Term {
 	kbs, _ := r.DB.ListTaskKBs(taskID)
 	var terms []subtitle.Term
-	for _, k := range kbs { // ordered by priority asc => front wins (append later has lower priority)
+	for _, k := range kbs {
 		v, err := r.DB.GetKBVersion(k.KBID, k.Version)
 		if err != nil {
 			continue
 		}
-		t, _, err := LoadTerms(v.DirPath)
+		t, err := LoadTermsFromVersion(v.DirPath)
 		if err == nil {
 			terms = append(terms, t...)
 		}
@@ -319,7 +367,7 @@ func (r *Runner) generate(ctx context.Context, task *db.Task, unified, danmu str
 			break
 		}
 		qPrompt := ctxText + "\n\n你正在进行第" + strconv.Itoa(round) + "轮深度阅读。请基于目前对字幕的理解，列出你想回看视频画面的时间点与疑问。严格输出 JSON 数组，元素形如 {\"timestamp\": 秒数, \"question\": \"...\"}，最多 8 条。"
-		res, e := sClient.Chat(ctx, []deepseek.Message{{Role: "user", Content: qPrompt}})
+		res, e := sClient.ChatText(ctx, qPrompt)
 		if e != nil {
 			break
 		}
@@ -360,7 +408,7 @@ func (r *Runner) generate(ctx context.Context, task *db.Task, unified, danmu str
 		"knowledge_md 结构：知识点卡片条目化，每条=标题+一句话结论+详细说明(2-5行)+关键词/标签+来源时间戳，顶部带目录。\n只输出 JSON，不要多余文字。",
 		title, task.Filename, mmss(dur), task.ID, time.Now().Format("2006-01-02 15:04"))
 
-	finalRes, err := sClient.Chat(ctx, []deepseek.Message{{Role: "user", Content: finalPrompt}})
+	finalRes, err := sClient.ChatText(ctx, finalPrompt)
 	if err != nil {
 		return "", "", err
 	}
@@ -495,4 +543,11 @@ func downloadFile(ctx context.Context, url, dst string) error {
 	defer f.Close()
 	_, err = io.Copy(f, resp.Body)
 	return err
+}
+
+func truncate(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
 }

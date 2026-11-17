@@ -2,26 +2,52 @@ package db
 
 import (
 	"database/sql"
+	"time"
 )
 
 // ---------------- profiles ----------------
 
 func (d *DB) CreateProfile(p *Profile) (int64, error) {
-	res, err := d.Exec(`INSERT INTO profiles(capability,name,base_url,api_key,model,extra,created_at)
-		VALUES(?,?,?,?,?,?,?)`, p.Capability, p.Name, p.BaseURL, p.APIKey, p.Model, p.Extra, now())
+	res, err := d.Exec(`INSERT INTO profiles(capability,protocol,name,base_url,api_key,model,temperature,timeout_seconds,extra,created_at)
+		VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		p.Capability, p.Protocol, p.Name, p.BaseURL, p.APIKey, p.Model, nullableFloat(p.Temperature), p.TimeoutSeconds, p.Extra, now())
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
 }
 
+func nullableFloat(f *float64) any {
+	if f == nil {
+		return nil
+	}
+	return *f
+}
+
+const profileCols = `id,capability,protocol,name,base_url,api_key,model,temperature,timeout_seconds,extra,created_at`
+
+func scanProfile(sc interface{ Scan(...any) error }) (*Profile, error) {
+	var p Profile
+	var temp sql.NullFloat64
+	err := sc.Scan(&p.ID, &p.Capability, &p.Protocol, &p.Name, &p.BaseURL, &p.APIKey, &p.Model,
+		&temp, &p.TimeoutSeconds, &p.Extra, &p.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if temp.Valid {
+		v := temp.Float64
+		p.Temperature = &v
+	}
+	return &p, nil
+}
+
 func (d *DB) ListProfiles(capability string) ([]Profile, error) {
 	var rows *sql.Rows
 	var err error
 	if capability != "" {
-		rows, err = d.Query(`SELECT id,capability,name,base_url,api_key,model,extra,created_at FROM profiles WHERE capability=? ORDER BY id`, capability)
+		rows, err = d.Query(`SELECT `+profileCols+` FROM profiles WHERE capability=? ORDER BY id`, capability)
 	} else {
-		rows, err = d.Query(`SELECT id,capability,name,base_url,api_key,model,extra,created_at FROM profiles ORDER BY id`)
+		rows, err = d.Query(`SELECT ` + profileCols + ` FROM profiles ORDER BY id`)
 	}
 	if err != nil {
 		return nil, err
@@ -29,31 +55,26 @@ func (d *DB) ListProfiles(capability string) ([]Profile, error) {
 	defer rows.Close()
 	var out []Profile
 	for rows.Next() {
-		var p Profile
-		if err := rows.Scan(&p.ID, &p.Capability, &p.Name, &p.BaseURL, &p.APIKey, &p.Model, &p.Extra, &p.CreatedAt); err != nil {
+		p, err := scanProfile(rows)
+		if err != nil {
 			return nil, err
 		}
-		out = append(out, p)
+		out = append(out, *p)
 	}
 	return out, rows.Err()
 }
 
 func (d *DB) GetProfile(id int64) (*Profile, error) {
-	var p Profile
-	err := d.QueryRow(`SELECT id,capability,name,base_url,api_key,model,extra,created_at FROM profiles WHERE id=?`, id).
-		Scan(&p.ID, &p.Capability, &p.Name, &p.BaseURL, &p.APIKey, &p.Model, &p.Extra, &p.CreatedAt)
+	p, err := scanProfile(d.QueryRow(`SELECT `+profileCols+` FROM profiles WHERE id=?`, id))
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
+	return p, err
 }
 
 func (d *DB) UpdateProfile(p *Profile) error {
-	_, err := d.Exec(`UPDATE profiles SET capability=?,name=?,base_url=?,api_key=?,model=?,extra=? WHERE id=?`,
-		p.Capability, p.Name, p.BaseURL, p.APIKey, p.Model, p.Extra, p.ID)
+	_, err := d.Exec(`UPDATE profiles SET capability=?,protocol=?,name=?,base_url=?,api_key=?,model=?,temperature=?,timeout_seconds=?,extra=? WHERE id=?`,
+		p.Capability, p.Protocol, p.Name, p.BaseURL, p.APIKey, p.Model, nullableFloat(p.Temperature), p.TimeoutSeconds, p.Extra, p.ID)
 	return err
 }
 
@@ -120,8 +141,8 @@ func (d *DB) AddKBVersion(v *KBVersion) (*KBVersion, error) {
 	}
 	v.Version = latest + 1
 	v.CreatedAt = now()
-	res, err := tx.Exec(`INSERT INTO knowledge_base_versions(kb_id,version,dir_path,file_name,term_count,sha256,created_at)
-		VALUES(?,?,?,?,?,?,?)`, v.KBID, v.Version, v.DirPath, v.FileName, v.TermCount, v.SHA256, v.CreatedAt)
+	res, err := tx.Exec(`INSERT INTO knowledge_base_versions(kb_id,version,dir_path,file_name,sha256,term_count,size_bytes,created_at)
+		VALUES(?,?,?,?,?,?,?,?)`, v.KBID, v.Version, v.DirPath, v.FileName, v.SHA256, v.TermCount, v.SizeBytes, v.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -132,55 +153,86 @@ func (d *DB) AddKBVersion(v *KBVersion) (*KBVersion, error) {
 	return v, tx.Commit()
 }
 
-func (d *DB) ListKBVersions(kbID int64) ([]KBVersion, error) {
-	rows, err := d.Query(`SELECT id,kb_id,version,dir_path,file_name,term_count,sha256,created_at
-		FROM knowledge_base_versions WHERE kb_id=? ORDER BY version DESC`, kbID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []KBVersion
-	for rows.Next() {
-		var v KBVersion
-		if err := rows.Scan(&v.ID, &v.KBID, &v.Version, &v.DirPath, &v.FileName, &v.TermCount, &v.SHA256, &v.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, v)
-	}
-	return out, rows.Err()
-}
+const kbVersionCols = `id,kb_id,version,dir_path,file_name,sha256,term_count,size_bytes,created_at`
 
-func (d *DB) GetKBVersion(kbID int64, version int) (*KBVersion, error) {
+func scanKBVersion(sc interface{ Scan(...any) error }) (*KBVersion, error) {
 	var v KBVersion
-	err := d.QueryRow(`SELECT id,kb_id,version,dir_path,file_name,term_count,sha256,created_at
-		FROM knowledge_base_versions WHERE kb_id=? AND version=?`, kbID, version).
-		Scan(&v.ID, &v.KBID, &v.Version, &v.DirPath, &v.FileName, &v.TermCount, &v.SHA256, &v.CreatedAt)
-	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
-	}
+	err := sc.Scan(&v.ID, &v.KBID, &v.Version, &v.DirPath, &v.FileName, &v.SHA256, &v.TermCount, &v.SizeBytes, &v.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return &v, nil
 }
 
-// ---------------- tasks ----------------
+func (d *DB) ListKBVersions(kbID int64) ([]KBVersion, error) {
+	rows, err := d.Query(`SELECT `+kbVersionCols+` FROM knowledge_base_versions WHERE kb_id=? ORDER BY version DESC`, kbID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []KBVersion
+	for rows.Next() {
+		v, err := scanKBVersion(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *v)
+	}
+	return out, rows.Err()
+}
 
-func (d *DB) CreateTask(t *Task) error {
-	_, err := d.Exec(`INSERT INTO tasks(id,status,stage,progress,error,source_type,video_url,video_path,filename,
-		summary_preference,screenshot_mode,screenshot_interval,reading_depth,summary_profile_id,asr_profile_id,
-		vision_profile_id,reading_profile_id,generate_ai_subtitle_via_asr,generate_vision_subtitle,cost_summary,created_at,updated_at)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		t.ID, t.Status, t.Stage, t.Progress, t.Error, t.SourceType, t.VideoURL, t.VideoPath, t.Filename,
-		t.SummaryPreference, t.ScreenshotMode, t.ScreenshotInterval, t.ReadingDepth, t.SummaryProfileID,
-		t.ASRProfileID, t.VisionProfileID, t.ReadingProfileID, boolToInt(t.GenerateAIViaASR), boolToInt(t.GenerateVision),
-		t.CostSummary, now(), now())
+func (d *DB) GetKBVersion(kbID int64, version int) (*KBVersion, error) {
+	v, err := scanKBVersion(d.QueryRow(`SELECT `+kbVersionCols+` FROM knowledge_base_versions WHERE kb_id=? AND version=?`, kbID, version))
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return v, err
+}
+
+func (d *DB) DeleteKBVersion(kbID int64, version int) error {
+	_, err := d.Exec(`DELETE FROM knowledge_base_versions WHERE kb_id=? AND version=?`, kbID, version)
 	return err
 }
 
-func (d *DB) UpdateTaskState(id, status, stage string, progress int, errMsg string) error {
-	_, err := d.Exec(`UPDATE tasks SET status=?,stage=?,progress=?,error=?,updated_at=? WHERE id=?`,
-		status, stage, progress, errMsg, now(), id)
+// CountVersionRefs returns how many tasks reference (kbID, version).
+func (d *DB) CountVersionRefs(kbID int64, version int) (int, error) {
+	var n int
+	err := d.QueryRow(`SELECT COUNT(1) FROM task_knowledge_bases WHERE kb_id=? AND version=?`, kbID, version).Scan(&n)
+	return n, err
+}
+
+// ---------------- tasks ----------------
+
+func (d *DB) CreateTask(t *Task) error {
+	_, err := d.Exec(`INSERT INTO tasks(id,status,progress,error,source_type,video_url,video_path,filename,
+		summary_preference,screenshot_mode,screenshot_interval,reading_depth,summary_profile_id,asr_profile_id,
+		vision_profile_id,reading_profile_id,generate_ai_subtitle_via_asr,generate_vision_subtitle,cost_summary,
+		started_at,finished_at,created_at,updated_at)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		t.ID, t.Status, t.Progress, t.Error, t.SourceType, t.VideoURL, t.VideoPath, t.Filename,
+		t.SummaryPreference, t.ScreenshotMode, t.ScreenshotInterval, t.ReadingDepth, t.SummaryProfileID,
+		t.ASRProfileID, t.VisionProfileID, t.ReadingProfileID, boolToInt(t.GenerateAIViaASR), boolToInt(t.GenerateVision),
+		t.CostSummary, "", "", now(), now())
+	return err
+}
+
+func (d *DB) UpdateTaskStatus(id, status string, progress int, errMsg string) error {
+	_, err := d.Exec(`UPDATE tasks SET status=?,progress=?,error=?,updated_at=? WHERE id=?`, status, progress, errMsg, now(), id)
+	return err
+}
+
+func (d *DB) SetTaskStarted(id string) error {
+	_, err := d.Exec(`UPDATE tasks SET status='running',started_at=?,updated_at=? WHERE id=?`, now(), now(), id)
+	return err
+}
+
+func (d *DB) SetTaskFinished(id, status, errMsg string) error {
+	progress := 100
+	if status != "done" {
+		progress = 0
+	}
+	_, err := d.Exec(`UPDATE tasks SET status=?,progress=?,error=?,finished_at=?,updated_at=? WHERE id=?`,
+		status, progress, errMsg, now(), now(), id)
 	return err
 }
 
@@ -194,17 +246,18 @@ func (d *DB) UpdateTaskVideo(id, videoPath string) error {
 	return err
 }
 
-const taskCols = `id,status,stage,progress,error,source_type,video_url,video_path,filename,
+const taskCols = `id,status,progress,error,source_type,video_url,video_path,filename,
 	summary_preference,screenshot_mode,screenshot_interval,reading_depth,summary_profile_id,asr_profile_id,
-	vision_profile_id,reading_profile_id,generate_ai_subtitle_via_asr,generate_vision_subtitle,cost_summary,created_at,updated_at`
+	vision_profile_id,reading_profile_id,generate_ai_subtitle_via_asr,generate_vision_subtitle,cost_summary,
+	started_at,finished_at,created_at,updated_at`
 
 func scanTask(sc interface{ Scan(...any) error }) (*Task, error) {
 	var t Task
 	var g1, g2 int
-	err := sc.Scan(&t.ID, &t.Status, &t.Stage, &t.Progress, &t.Error, &t.SourceType, &t.VideoURL, &t.VideoPath,
+	err := sc.Scan(&t.ID, &t.Status, &t.Progress, &t.Error, &t.SourceType, &t.VideoURL, &t.VideoPath,
 		&t.Filename, &t.SummaryPreference, &t.ScreenshotMode, &t.ScreenshotInterval, &t.ReadingDepth,
 		&t.SummaryProfileID, &t.ASRProfileID, &t.VisionProfileID, &t.ReadingProfileID, &g1, &g2, &t.CostSummary,
-		&t.CreatedAt, &t.UpdatedAt)
+		&t.StartedAt, &t.FinishedAt, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -239,10 +292,73 @@ func (d *DB) ListTasks() ([]Task, error) {
 }
 
 func (d *DB) DeleteTask(id string) error {
-	_, err := d.Exec(`DELETE FROM tasks WHERE id=?`, id)
 	d.Exec(`DELETE FROM task_subtitles WHERE task_id=?`, id)
 	d.Exec(`DELETE FROM task_knowledge_bases WHERE task_id=?`, id)
+	d.Exec(`DELETE FROM task_stages WHERE task_id=?`, id)
+	_, err := d.Exec(`DELETE FROM tasks WHERE id=?`, id)
 	return err
+}
+
+// ---------------- task stages ----------------
+
+// EnsureStage inserts a pending stage row if absent.
+func (d *DB) EnsureStage(taskID, stage string) error {
+	_, err := d.Exec(`INSERT OR IGNORE INTO task_stages(task_id,stage,status,progress) VALUES(?,?,'pending',0)`, taskID, stage)
+	return err
+}
+
+// StartStage marks a stage running and records its start time.
+func (d *DB) StartStage(taskID, stage string) error {
+	if err := d.EnsureStage(taskID, stage); err != nil {
+		return err
+	}
+	_, err := d.Exec(`UPDATE task_stages SET status='running',started_at=?,progress=0,error='' WHERE task_id=? AND stage=?`, now(), taskID, stage)
+	return err
+}
+
+// UpdateStageProgress updates a stage's progress/message.
+func (d *DB) UpdateStageProgress(taskID, stage string, progress int, message string) error {
+	_, err := d.Exec(`UPDATE task_stages SET progress=?,message=? WHERE task_id=? AND stage=?`, progress, message, taskID, stage)
+	return err
+}
+
+// FinishStage marks a stage done/failed/skipped and records duration.
+func (d *DB) FinishStage(taskID, stage, status, message, errMsg string) error {
+	if err := d.EnsureStage(taskID, stage); err != nil {
+		return err
+	}
+	var started string
+	_ = d.QueryRow(`SELECT started_at FROM task_stages WHERE task_id=? AND stage=?`, taskID, stage).Scan(&started)
+	var dur int64
+	if started != "" {
+		if st, err := time.Parse(time.RFC3339, started); err == nil {
+			dur = time.Since(st).Milliseconds()
+		}
+	}
+	progress := 100
+	if status == "failed" {
+		progress = 0
+	}
+	_, err := d.Exec(`UPDATE task_stages SET status=?,progress=?,finished_at=?,duration_ms=?,message=?,error=? WHERE task_id=? AND stage=?`,
+		status, progress, now(), dur, message, errMsg, taskID, stage)
+	return err
+}
+
+func (d *DB) ListStages(taskID string) ([]TaskStage, error) {
+	rows, err := d.Query(`SELECT id,task_id,stage,status,progress,started_at,finished_at,duration_ms,message,error FROM task_stages WHERE task_id=? ORDER BY id`, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []TaskStage
+	for rows.Next() {
+		var s TaskStage
+		if err := rows.Scan(&s.ID, &s.TaskID, &s.Stage, &s.Status, &s.Progress, &s.StartedAt, &s.FinishedAt, &s.DurationMs, &s.Message, &s.Error); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }
 
 // ---------------- task subtitles ----------------
@@ -297,22 +413,9 @@ func (d *DB) ListTaskKBs(taskID string) ([]TaskKB, error) {
 	return out, rows.Err()
 }
 
-// ---------------- settings ----------------
-
-// GetSetting returns the value for key, or "" if absent.
-func (d *DB) GetSetting(key string) (string, error) {
-	var v string
-	err := d.QueryRow(`SELECT value FROM settings WHERE key=?`, key).Scan(&v)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return v, err
-}
-
-// SetSetting upserts a key/value.
-func (d *DB) SetSetting(key, value string) error {
-	_, err := d.Exec(`INSERT INTO settings(key,value) VALUES(?,?)
-		ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
+// DeleteTaskStages clears all stage rows for a task (used on retry).
+func (d *DB) DeleteTaskStages(taskID string) error {
+	_, err := d.Exec(`DELETE FROM task_stages WHERE task_id=?`, taskID)
 	return err
 }
 

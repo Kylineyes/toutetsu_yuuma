@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -31,7 +32,7 @@ func main() {
 	wk := worker.New(runner, 2)
 	a := &api.API{DB: database, Cfg: cfg, Worker: wk}
 
-	addr := ":" + cfg.Port
+	addr := net.JoinHostPort(cfg.Host, cfg.Port)
 	log.Printf("toutetsu_yuuma backend listening on %s (data=%s)", addr, cfg.DataDir)
 	if err := http.ListenAndServe(addr, a.Routes()); err != nil {
 		log.Fatalf("server: %v", err)
