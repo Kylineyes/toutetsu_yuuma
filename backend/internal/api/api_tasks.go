@@ -13,7 +13,13 @@ import (
 )
 
 func (a *API) createTask(w http.ResponseWriter, r *http.Request) {
+	// 上传总大小上限：包裹请求体，超限时 ParseMultipartForm 会返回错误。
+	LimitBody(w, r, a.Cfg.MaxUploadBytes)
 	if err := r.ParseMultipartForm(64 << 20); err != nil {
+		if isMaxBytesError(err) {
+			writeErr(w, http.StatusRequestEntityTooLarge, "上传内容超过大小上限")
+			return
+		}
 		writeErr(w, 400, "需要 multipart/form-data")
 		return
 	}
@@ -57,7 +63,7 @@ func (a *API) createTask(w http.ResponseWriter, r *http.Request) {
 		}
 		task.SourceType = "file"
 		task.VideoPath = dst
-		task.Filename = filepath.Base(hdr.Filename)
+		task.Filename = SanitizeFilename(hdr.Filename)
 	} else {
 		writeErr(w, 400, "需要 video_file 或 video_url")
 		return
@@ -70,10 +76,13 @@ func (a *API) createTask(w http.ResponseWriter, r *http.Request) {
 
 	for _, kind := range []string{"native", "ai", "vision", "danmu"} {
 		if f, hdr, err := r.FormFile("subtitle_" + kind); err == nil {
-			name := filepath.Base(hdr.Filename)
-			dst := filepath.Join(uploadDir, kind+"_"+name)
-			if err := saveUpload(f, dst); err == nil {
-				_ = a.DB.AddTaskSubtitle(&db.TaskSubtitle{TaskID: id, Kind: kind, OrigName: name, StoredPath: dst})
+			name := SanitizeFilename(hdr.Filename)
+			// 用 SafeJoin 确保落盘路径不越出 uploadDir。
+			dst, jerr := SafeJoin(uploadDir, kind+"_"+name)
+			if jerr == nil {
+				if err := saveUpload(f, dst); err == nil {
+					_ = a.DB.AddTaskSubtitle(&db.TaskSubtitle{TaskID: id, Kind: kind, OrigName: name, StoredPath: dst})
+				}
 			}
 			f.Close()
 		}
@@ -197,7 +206,13 @@ func (a *API) cleanupTaskCache(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "任务状态为 "+t.Status+"，仅 paused/failed/done 可清理缓存")
 		return
 	}
-	dir := filepath.Join(a.Cfg.TmpDir, "intermediates", id)
+	root := filepath.Join(a.Cfg.TmpDir, "intermediates")
+	dir := filepath.Join(root, filepath.Base(id))
+	// 安全校验：待删目录必须严格位于 intermediates 之下，防止 id 造成路径穿越而误删。
+	if !WithinDir(root, dir) || filepath.Clean(dir) == filepath.Clean(root) {
+		writeErr(w, 400, "非法任务路径")
+		return
+	}
 	if err := os.RemoveAll(dir); err != nil {
 		writeErr(w, 500, err.Error())
 		return
