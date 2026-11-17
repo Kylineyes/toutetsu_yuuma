@@ -338,7 +338,8 @@ func (c *Client) chatGemini(ctx context.Context, parts []Part) (*ChatResult, err
 		Candidates []struct {
 			Content struct {
 				Parts []struct {
-					Text string `json:"text"`
+					Text    string `json:"text"`
+					Thought bool   `json:"thought"`
 				} `json:"parts"`
 			} `json:"content"`
 		} `json:"candidates"`
@@ -352,6 +353,10 @@ func (c *Client) chatGemini(ctx context.Context, parts []Part) (*ChatResult, err
 	}
 	var b strings.Builder
 	for _, pt := range parsed.Candidates[0].Content.Parts {
+		// Gemini 推理模型会在 parts 中返回 thought=true 的思考片段，需跳过，只取正式回复文本。
+		if pt.Thought {
+			continue
+		}
 		b.WriteString(pt.Text)
 	}
 	return &ChatResult{Text: b.String(), PromptTokens: parsed.UsageMetadata.PromptTokenCount, CompletionTokens: parsed.UsageMetadata.CandidatesTokenCount}, nil
