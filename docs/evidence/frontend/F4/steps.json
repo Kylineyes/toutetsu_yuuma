@@ -1,0 +1,50 @@
+[
+  {
+    "step": "1_创建知识库",
+    "created": 1,
+    "createReq": [],
+    "pass": true
+  },
+  {
+    "step": "2_查看版本",
+    "vTable": "版本\t文件\t术语数\t大小\tsha256\t时间\t | v3 最新\tterms_big.csv\t81\t3.4 KB\t31cdc125692d5a2e…\t2026-11-18T05:24:35+08:00\t删除 | v2\tterms2.csv\t4\t56 B\t048a7eb19bf3ec60…\t2026-11-18T05:24:29+08:00\t删除 | v1\tterms1.csv\t3\t42 B\td5b650079d63e089…\t2026-11-18T05:24:29+08:00\t删除",
+    "hasKB": true,
+    "pass": true
+  },
+  {
+    "step": "3_删除被引用版本",
+    "errShown": "该版本被 1 个任务引用，不可删除",
+    "delReq": [
+      {
+        "m": "DELETE",
+        "u": "/api/v1/knowledge-bases/1/versions/1",
+        "s": 400
+      }
+    ],
+    "pass": true
+  },
+  {
+    "step": "4_删除未引用旧版本",
+    "delReq": [
+      {
+        "m": "DELETE",
+        "u": "/api/v1/knowledge-bases/1/versions/2",
+        "s": 200
+      }
+    ],
+    "v2Gone": true,
+    "pass": true
+  },
+  {
+    "step": "5_UI上传新版本",
+    "uploadReq": [
+      {
+        "m": "POST",
+        "u": "/api/v1/knowledge-bases/3/versions",
+        "s": 201
+      }
+    ],
+    "uiTable": "版本\t文件\t术语数\t大小\tsha256\t时间\t | v1 最新\tui_terms.csv\t3\t59 B\te9511eb208acbef7…\t2026-11-18T05:25:30+08:00\t删除",
+    "pass": true
+  }
+]

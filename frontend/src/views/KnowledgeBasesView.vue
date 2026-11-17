@@ -37,7 +37,15 @@ async function upload(kbId) {
 }
 async function delVersion(kb, v) {
   if (!confirm('删除版本 v' + v.version + '？仅未被任务引用的旧版本可删。')) return
+  err.value = ''
   try { await api.deleteKBVersion(kb.id, v.version); versions.value[kb.id] = await api.kbVersions(kb.id); await load() } catch (e) { err.value = e.message }
+}
+// 人类可读的文件大小
+function fmtSize(n) {
+  if (n == null) return '-'
+  if (n < 1024) return n + ' B'
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB'
+  return (n / 1024 / 1024).toFixed(2) + ' MB'
 }
 onMounted(load)
 </script>
@@ -45,7 +53,7 @@ onMounted(load)
 <template>
   <h2>知识库</h2>
   <p style="color:#64748b">术语正文存本地目录，DB 只做版本索引。每次上传/更新刷新一个版本（v1、v2…，快照不可变）。</p>
-  <div v-if="err" class="card" style="color:#b91c1c">{{ err }}</div>
+  <div v-if="err" class="card err" style="color:#b91c1c">{{ err }}</div>
 
   <div class="card">
     <div class="row">
@@ -68,10 +76,10 @@ onMounted(load)
       <thead><tr><th>版本</th><th>文件</th><th>术语数</th><th>大小</th><th>sha256</th><th>时间</th><th></th></tr></thead>
       <tbody>
         <tr v-for="v in versions[kb.id]" :key="v.id">
-          <td>v{{ v.version }}</td><td>{{ v.file_name }}</td><td>{{ v.term_count }}</td>
-          <td>{{ v.size_bytes }} B</td>
+          <td>v{{ v.version }} <span v-if="v.version === kb.latest_version" class="tag done">最新</span></td><td>{{ v.file_name }}</td><td>{{ v.term_count }}</td>
+          <td>{{ fmtSize(v.size_bytes) }}</td>
           <td style="font-family:monospace;font-size:11px">{{ (v.sha256||'').slice(0,16) }}…</td><td>{{ v.created_at }}</td>
-          <td><button class="danger" @click="delVersion(kb, v)">删除</button></td>
+          <td><button class="danger" :disabled="v.version === kb.latest_version" @click="delVersion(kb, v)">删除</button></td>
         </tr>
       </tbody>
     </table>
