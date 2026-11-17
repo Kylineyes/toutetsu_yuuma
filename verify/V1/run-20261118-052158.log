@@ -1,0 +1,44 @@
+===== 命令: powershell -ExecutionPolicy Bypass -File verify/V1/_v1_curl.ps1 (BASE=http://127.0.0.1:18086, PASSWORD=test123, API_TOKEN=tok-abc) =====
+2026-11-18T05:21:58+08:00
+
+== 目标: http://127.0.0.1:18086 ==
+== 1. 免鉴权端点 ==
+  [PASS] GET /health 200
+  [PASS] GET /session 200
+== 2. 401 未授权 ==
+  [PASS] GET /profiles 无凭证 -> 401
+== 3. 错误口令 ==
+  [PASS] POST /login 错误口令 -> 401
+== 4. 正确口令 + Cookie ==
+  [PASS] POST /login 正确口令 -> 200
+  [PASS] Set-Cookie 含 session
+== 5. Cookie 鉴权 ==
+  [PASS] GET /profiles 带Cookie -> 200
+== 6. X-API-Token ==
+  [PASS] X-API-Token 正确 -> 200
+  [PASS] X-API-Token 错误 -> 401(无Cookie)
+== 7. profiles CRUD + 脱敏 ==
+  [PASS] POST /profiles -> id=1
+  [PASS] api_key 已脱敏(不含明文sk-x)
+  [PASS] DELETE profile 200
+== 8. knowledge-bases 版本与删除保护 ==
+  [PASS] POST /knowledge-bases -> id=1
+  [PASS] 上传 v1 (201)
+  [PASS] 上传 v2 (201)
+  [PASS] 删最新版 -> 400(保护)
+  [PASS] 删旧版 -> 200
+  [PASS] 删KB -> 200
+== 9. tasks 创建/列表/详情/stages/result ==
+  [PASS] POST /tasks -> id=1794950519569263500-50519
+  [PASS] GET /tasks 200
+  [PASS] GET task 200
+  [PASS] GET stages 200
+  [PASS] result 七键齐
+  [PASS] 未生成 summary.md -> 404
+  [PASS] DELETE task 200
+== 10. logout ==
+  [PASS] POST /logout 200
+
+================ 汇总: PASS=26 FAIL=0 ================
+
+V1_EXIT=0
