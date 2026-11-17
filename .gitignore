@@ -1,0 +1,12 @@
+# data
+data/
+*.db
+*.db-*
+# go
+backend/server
+backend/*.exe
+# node
+frontend/node_modules/
+frontend/dist/
+# env
+.env
