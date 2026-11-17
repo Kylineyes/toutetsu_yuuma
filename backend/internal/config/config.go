@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Port                     string
 	DataDir                  string
+	TmpDir                   string // base for intermediates (default os.TempDir())
 	DefaultScreenshotInterval int   // seconds
 	MaxFrames                int   // max frames per task
 	Timezone                 string
@@ -35,6 +36,7 @@ func Load() *Config {
 	return &Config{
 		Port:                      getenv("PORT", "8080"),
 		DataDir:                   getenv("DATA_DIR", "./data"),
+		TmpDir:                    getenv("TMP_DIR", os.TempDir()),
 		DefaultScreenshotInterval: getint("DEFAULT_SCREENSHOT_INTERVAL", 60),
 		MaxFrames:                 getint("MAX_FRAMES", 120),
 		Timezone:                  getenv("TZ", "Asia/Shanghai"),

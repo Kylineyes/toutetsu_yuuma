@@ -86,7 +86,7 @@ func (r *Runner) Run(ctx context.Context, taskID string) {
 	uploadDir := filepath.Join(baseDir, "upload")
 	subsDir := filepath.Join(baseDir, "subs")
 	outDir := filepath.Join(baseDir, "output")
-	workDir := filepath.Join(os.TempDir(), "intermediates", taskID)
+	workDir := filepath.Join(r.Cfg.TmpDir, "intermediates", taskID)
 	for _, d := range []string{uploadDir, subsDir, outDir, workDir} {
 		_ = os.MkdirAll(d, 0o755)
 	}

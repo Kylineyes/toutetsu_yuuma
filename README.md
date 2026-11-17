@@ -61,6 +61,7 @@ npm install && npm run dev        # http://localhost:5173 （已代理 /api → 
 | --- | --- | --- |
 | PORT | 8080 | 监听端口 |
 | DATA_DIR | ./data | 数据根目录（db / task / knowledge-bases） |
+| TMP_DIR | 系统临时目录 | 中间产物根目录（音频/分片/截图帧，落 TMP_DIR/intermediates） |
 | DEFAULT_SCREENSHOT_INTERVAL | 60 | 默认截图间隔（秒）|
 | MAX_FRAMES | 120 | 单任务最多截帧数 |
 | TZ | Asia/Shanghai | 时区 |
