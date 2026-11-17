@@ -9,7 +9,7 @@ const versions = ref({}) // kbId -> list
 const uploadFiles = ref({}) // kbId -> File
 
 async function load() {
-  try { kbs.value = await api.kbs() } catch (e) { err.value = e.message }
+  try { const list = await api.kbs(); kbs.value = Array.isArray(list) ? list : [] } catch (e) { err.value = e.message }
 }
 async function create() {
   if (!newName.value.trim()) return
@@ -21,7 +21,7 @@ async function del(id) {
 }
 async function toggleVersions(kb) {
   if (versions.value[kb.id]) { delete versions.value[kb.id]; return }
-  try { versions.value[kb.id] = await api.kbVersions(kb.id) } catch (e) { err.value = e.message }
+  try { const vs = await api.kbVersions(kb.id); versions.value[kb.id] = Array.isArray(vs) ? vs : [] } catch (e) { err.value = e.message }
 }
 function pickFile(kbId, e) { uploadFiles.value[kbId] = e.target.files[0] }
 async function upload(kbId) {
@@ -32,13 +32,13 @@ async function upload(kbId) {
     await api.uploadKB(kbId, fd)
     uploadFiles.value[kbId] = null
     await load()
-    versions.value[kbId] = await api.kbVersions(kbId)
+    const vs2 = await api.kbVersions(kbId); versions.value[kbId] = Array.isArray(vs2) ? vs2 : []
   } catch (e) { err.value = e.message }
 }
 async function delVersion(kb, v) {
   if (!confirm('删除版本 v' + v.version + '？仅未被任务引用的旧版本可删。')) return
   err.value = ''
-  try { await api.deleteKBVersion(kb.id, v.version); versions.value[kb.id] = await api.kbVersions(kb.id); await load() } catch (e) { err.value = e.message }
+  try { await api.deleteKBVersion(kb.id, v.version); const vs3 = await api.kbVersions(kb.id); versions.value[kb.id] = Array.isArray(vs3) ? vs3 : []; await load() } catch (e) { err.value = e.message }
 }
 // 人类可读的文件大小
 function fmtSize(n) {

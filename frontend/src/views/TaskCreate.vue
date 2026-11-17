@@ -22,8 +22,17 @@ const form = ref({
 const files = ref({ video: null, native: null, ai: null, vision: null, danmu: null })
 
 async function load() {
-  for (const c of caps) { try { profiles.value[c] = await api.profiles(c) } catch (e) {} }
-  try { kbs.value = await api.kbs() } catch (e) {}
+  // 后端在无数据时返回 JSON null，这里统一兜底为数组，避免模板 .length 抛错导致白屏
+  for (const c of caps) {
+    try {
+      const list = await api.profiles(c)
+      profiles.value[c] = Array.isArray(list) ? list : []
+    } catch (e) { profiles.value[c] = [] }
+  }
+  try {
+    const list = await api.kbs()
+    kbs.value = Array.isArray(list) ? list : []
+  } catch (e) { kbs.value = [] }
 }
 async function toggleKB(kb) {
   // 再次点击已选中的则取消选择

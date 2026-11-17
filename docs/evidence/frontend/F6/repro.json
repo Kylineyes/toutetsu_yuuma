@@ -1,0 +1,20 @@
+{
+  "ev": [
+    {
+      "step": "REPRO_空库打开新建",
+      "hasH2": 1,
+      "hasEmptyMsg": 1,
+      "fileInputs": 5,
+      "whiteScreen": false,
+      "contentPreview": "新建任务\n视频源\n 上传文件\n 直链 URL\n视频文件\n字幕（各 1 份，可空）\n原生字幕\nAI 字幕\n识图字幕\n弹幕列表\n AI 字幕由服务用 ASR 生成\n 识图字幕由服务用识图模型生成\n配置方案（每类选一个）\n总结\n（不选）\nASR\n",
+      "errors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "PAGEERROR: Cannot read properties of null (reading 'length')"
+      ]
+    }
+  ],
+  "errs": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "PAGEERROR: Cannot read properties of null (reading 'length')"
+  ]
+}

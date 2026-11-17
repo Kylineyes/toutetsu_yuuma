@@ -1,0 +1,10 @@
+[
+  {
+    "step": "PROD_空库新建页",
+    "hasH2": 1,
+    "emptyMsg": 1,
+    "fileInputs": 5,
+    "typeErrorsErrJson": [],
+    "pass": true
+  }
+]
