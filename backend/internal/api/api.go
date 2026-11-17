@@ -55,6 +55,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/tasks/{id}/result", a.taskResult)
 	mux.HandleFunc("GET /api/v1/tasks/{id}/files/{name}", a.taskFile)
 	mux.HandleFunc("POST /api/v1/tasks/{id}/retry", a.retryTask)
+	mux.HandleFunc("DELETE /api/v1/tasks/{id}/cache", a.cleanupTaskCache)
 	mux.HandleFunc("DELETE /api/v1/tasks/{id}", a.deleteTask)
 
 	return a.withAuth(mux)

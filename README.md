@@ -103,6 +103,7 @@ API Token **不使用环境变量**，而是**明文存储于数据库 `settings
 | GET | /tasks/{id}/result | 结构化结果（summary_md/knowledge_md/cost…）|
 | GET | /tasks/{id}/files/{name} | 下载 summary.md / knowledge.md / fused.srt / asr.srt / vision.srt |
 | POST | /tasks/{id}/retry | 重跑 |
+| DELETE | /tasks/{id}/cache | 清理该任务 tmp 中间文件（仅 paused/failed/done）|
 | DELETE | /tasks/{id} | 删除 |
 
 ### 新建任务（multipart 字段）

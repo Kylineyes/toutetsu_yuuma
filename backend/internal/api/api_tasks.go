@@ -182,6 +182,30 @@ func (a *API) deleteTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]string{"status": "ok"})
 }
 
+// cleanupTaskCache deletes the task's temporary intermediates under TMP_DIR.
+// Only allowed when the task is paused / failed / done (not queued or running).
+func (a *API) cleanupTaskCache(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	t, err := a.DB.GetTask(id)
+	if err != nil {
+		writeErr(w, 404, "not found")
+		return
+	}
+	switch t.Status {
+	case "done", "failed", "paused":
+		// ok
+	default:
+		writeErr(w, 400, "任务状态为 "+t.Status+"，仅 paused/failed/done 可清理缓存")
+		return
+	}
+	dir := filepath.Join(a.Cfg.TmpDir, "intermediates", id)
+	if err := os.RemoveAll(dir); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]string{"status": "ok", "cleaned": dir})
+}
+
 func saveUpload(src io.Reader, dst string) error {
 	f, err := os.Create(dst)
 	if err != nil {

@@ -35,6 +35,7 @@ export const api = {
   taskResult: (id) => fetch(`${base}/tasks/${id}/result`, { headers: H() }).then(handle),
   createTask: (fd) => fetch(`${base}/tasks`, { method: 'POST', headers: H(), body: fd }).then(handle),
   retryTask: (id) => fetch(`${base}/tasks/${id}/retry`, { method: 'POST', headers: H() }).then(handle),
+  cleanupCache: (id) => fetch(`${base}/tasks/${id}/cache`, { method: 'DELETE', headers: H() }).then(handle),
   deleteTask: (id) => fetch(`${base}/tasks/${id}`, { method: 'DELETE', headers: H() }).then(handle),
   fileUrl: (id, name) => `${base}/tasks/${id}/files/${name}${localStorage.getItem('api_token') ? '?token=' + encodeURIComponent(localStorage.getItem('api_token')) : ''}`,
 }

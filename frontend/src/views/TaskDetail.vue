@@ -20,6 +20,11 @@ async function load() {
 async function retry() {
   try { await api.retryTask(props.id); result.value = null; await load(); start() } catch (e) { err.value = e.message }
 }
+async function cleanup() {
+  if (!confirm('删除该任务的临时中间文件（tmp 缓存）？')) return
+  try { await api.cleanupCache(props.id); msg.value = '已清理 tmp 缓存' } catch (e) { err.value = e.message }
+}
+const msg = ref('')
 function start() { if (!timer) timer = setInterval(load, 3000) }
 function dl(name) { return api.fileUrl(props.id, name) }
 const cost = computed(() => result.value?.cost || {})
@@ -30,11 +35,13 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 
 <template>
   <div v-if="err" class="card" style="color:#b91c1c">{{ err }}</div>
+  <div v-if="msg" class="card" style="color:#166534">{{ msg }}</div>
   <template v-if="task">
     <div class="row" style="justify-content:space-between">
       <h2>任务 {{ task.id }}</h2>
       <div>
         <button v-if="task.status==='failed'" class="ghost" @click="retry">重跑</button>
+        <button v-if="['done','failed','paused'].includes(task.status)" class="ghost" style="margin-left:6px" @click="cleanup">清理缓存</button>
       </div>
     </div>
     <div class="card">
