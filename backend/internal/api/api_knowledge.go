@@ -70,7 +70,12 @@ func (a *API) uploadKBVersion(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "knowledge base not found")
 		return
 	}
+	LimitBody(w, r, a.Cfg.MaxUploadBytes)
 	if err := r.ParseMultipartForm(64 << 20); err != nil {
+		if isMaxBytesError(err) {
+			writeErr(w, http.StatusRequestEntityTooLarge, "上传内容超过大小上限")
+			return
+		}
 		writeErr(w, 400, "需要 multipart/form-data")
 		return
 	}
@@ -86,13 +91,14 @@ func (a *API) uploadKBVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ver := kb.LatestVersion + 1
-	dirPath, sha, newBytes, err := pipeline.IngestVersion(a.Cfg.DataDir, id, ver, hdr.Filename, content)
+	safeName := SanitizeFilename(hdr.Filename)
+	dirPath, sha, newBytes, err := pipeline.IngestVersion(a.Cfg.DataDir, id, ver, safeName, content)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
 	termCount := pipeline.CountTermsInVersion(dirPath)
-	v := &db.KBVersion{KBID: id, DirPath: dirPath, FileName: hdr.Filename, SHA256: sha, TermCount: termCount, SizeBytes: newBytes}
+	v := &db.KBVersion{KBID: id, DirPath: dirPath, FileName: safeName, SHA256: sha, TermCount: termCount, SizeBytes: newBytes}
 	saved, err := a.DB.AddKBVersion(v)
 	if err != nil {
 		writeErr(w, 500, err.Error())

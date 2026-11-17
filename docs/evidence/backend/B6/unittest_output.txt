@@ -1,0 +1,16 @@
+﻿=== RUN   TestSafeJoin_Traversal
+--- PASS: TestSafeJoin_Traversal (0.00s)
+=== RUN   TestWithinDir
+--- PASS: TestWithinDir (0.00s)
+=== RUN   TestSanitizeFilename
+--- PASS: TestSanitizeFilename (0.00s)
+=== RUN   TestCopyLimited_Oversize
+--- PASS: TestCopyLimited_Oversize (0.00s)
+=== RUN   TestCopyLimited_OK
+--- PASS: TestCopyLimited_OK (0.00s)
+=== RUN   TestLimitBody_413
+--- PASS: TestLimitBody_413 (0.00s)
+=== RUN   TestIsMaxBytesError_Direct
+--- PASS: TestIsMaxBytesError_Direct (0.00s)
+PASS
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/api	0.063s
