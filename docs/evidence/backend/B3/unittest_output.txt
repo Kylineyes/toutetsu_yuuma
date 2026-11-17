@@ -11,8 +11,8 @@
 === RUN   TestComputeProgress_Clamp
 --- PASS: TestComputeProgress_Clamp (0.00s)
 === RUN   TestRecomputeTaskProgress_Persisted
---- PASS: TestRecomputeTaskProgress_Persisted (0.30s)
+--- PASS: TestRecomputeTaskProgress_Persisted (0.26s)
 === RUN   TestStageWeightsSum100
 --- PASS: TestStageWeightsSum100 (0.00s)
 PASS
-ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/db	(cached)
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/db	0.327s

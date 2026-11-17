@@ -227,9 +227,12 @@ func (d *DB) SetTaskStarted(id string) error {
 }
 
 func (d *DB) SetTaskFinished(id, status, errMsg string) error {
-	progress := 100
-	if status != "done" {
-		progress = 0
+	// 进度以 task_stages 加权聚合为准：done 强制 100，其它状态保留当前聚合值（失败不清零已完成进度）。
+	var progress int
+	if status == "done" {
+		progress = 100
+	} else {
+		_ = d.QueryRow("SELECT progress FROM tasks WHERE id=?", id).Scan(&progress)
 	}
 	_, err := d.Exec(`UPDATE tasks SET status=?,progress=?,error=?,finished_at=?,updated_at=? WHERE id=?`,
 		status, progress, errMsg, now(), now(), id)
@@ -313,13 +316,23 @@ func (d *DB) StartStage(taskID, stage string) error {
 		return err
 	}
 	_, err := d.Exec(`UPDATE task_stages SET status='running',started_at=?,progress=0,error='' WHERE task_id=? AND stage=?`, now(), taskID, stage)
-	return err
+	if err != nil {
+		return err
+	}
+	// 阶段启动后重新聚合任务整体进度。
+	_, _ = d.RecomputeTaskProgress(taskID)
+	return nil
 }
 
 // UpdateStageProgress updates a stage's progress/message.
 func (d *DB) UpdateStageProgress(taskID, stage string, progress int, message string) error {
 	_, err := d.Exec(`UPDATE task_stages SET progress=?,message=? WHERE task_id=? AND stage=?`, progress, message, taskID, stage)
-	return err
+	if err != nil {
+		return err
+	}
+	// 阶段内部进度变化也会影响整体进度，实时回写。
+	_, _ = d.RecomputeTaskProgress(taskID)
+	return nil
 }
 
 // FinishStage marks a stage done/failed/skipped and records duration.
@@ -341,7 +354,12 @@ func (d *DB) FinishStage(taskID, stage, status, message, errMsg string) error {
 	}
 	_, err := d.Exec(`UPDATE task_stages SET status=?,progress=?,finished_at=?,duration_ms=?,message=?,error=? WHERE task_id=? AND stage=?`,
 		status, progress, now(), dur, message, errMsg, taskID, stage)
-	return err
+	if err != nil {
+		return err
+	}
+	// 阶段完成后按权重聚合回写任务整体进度。
+	_, _ = d.RecomputeTaskProgress(taskID)
+	return nil
 }
 
 func (d *DB) ListStages(taskID string) ([]TaskStage, error) {

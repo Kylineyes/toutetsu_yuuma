@@ -1,35 +1,38 @@
 # B3 进度聚合（tasks.progress 由 task_stages 加权计算）
 
-## 变更
-- 新增 `backend/internal/db/progress.go`：`StageWeights`（import10/audio10/asr25/frame10/vision15/fuse10/summary20，总和 100）、`ComputeProgress(stages)`、`RecomputeTaskProgress(taskID)`。
-- `backend/internal/db/repo.go`：`StartStage` / `UpdateStageProgress` / `FinishStage` 在写阶段后调用 `RecomputeTaskProgress` 回写 `tasks.progress`；`SetTaskFinished` 在 done 时置 100，否则保留聚合值（失败不再粗暴清零）。
-- `backend/internal/pipeline/pipeline.go`：移除 5 处硬编码里程碑进度（15/22/45/55/65），改由阶段聚合自动维护。
+## 修复记录（打回后）
+初次提交漏了关键一步：`StartStage` / `UpdateStageProgress` / `FinishStage` 未调用 `RecomputeTaskProgress`，
+导致运行中 tasks.progress 停在旧值（测试取到 0）。本次修复：
+- `StartStage`：更新 task_stages(running) 成功后 `_, _ = d.RecomputeTaskProgress(taskID)`
+- `UpdateStageProgress`：更新 progress/message 成功后重算
+- `FinishStage`：更新 done/failed/skipped 成功后重算
+- `SetTaskFinished`：done 强制 100，其它状态保留当前聚合值（失败不再清零）
+
+## 变更文件
+- 新增 `backend/internal/db/progress.go`：`StageWeights`(import10/audio10/asr25/frame10/vision15/fuse10/summary20=100)、`ComputeProgress`、`RecomputeTaskProgress`
+- `backend/internal/db/repo.go`：上述 4 个函数触发/利用聚合
+- `backend/internal/pipeline/pipeline.go`：删除 5 处硬编码里程碑进度（15/22/45/55/65）
 
 ## 聚合规则
-- 分母为全部注册阶段权重和（100）；未创建阶段按 0 计入。
-- done / skipped 计 100%；failed 计 0%；running / pending 按其 `progress`(0..100) 折算。
-- 结果 clamp 到 0..100。
+- 分母为全部注册阶段权重和(100)；未创建阶段按 0 计入。
+- done/skipped=100%；failed=0%；running/pending 按自身 progress(0..100) 折算；结果 clamp 0..100。
 
-## 单元测试（全绿）
-命令：`cd backend && go test ./internal/db/ -v`
-原始输出见 `unittest_output.txt`，用例：
-- TestComputeProgress_Empty / AllDone / SkippedCountsDone / Partial / Failed / Clamp
-- TestRecomputeTaskProgress_Persisted（真实 SQLite：StartStage/FinishStage/UpdateStageProgress 后回写进度 30 → 100）
-- TestStageWeightsSum100
+## 单元测试（8/8 全绿，连跑 3 次稳定）
+命令：`cd backend && go test ./internal/db/ -v -count=1`
+原始完整输出见 `unittest_output.txt`（8 个用例全部 PASS，含 TestRecomputeTaskProgress_Persisted：真实 SQLite 下 StartStage/FinishStage/UpdateStageProgress 后回写进度 30→100）。
 
-## 运行中接口验证（真实启动应用）
+## 运行中接口验证（真实启动应用，本 worktree）
 命令：
 ```
-set DATA_DIR/TMP_DIR/PORT=18080; go build -o server.exe ./cmd/server; .\server.exe
-curl -s http://127.0.0.1:18080/api/v1/health   # {"status":"ok"}
-curl -s -X POST -F "video_file=@_tiny.mp4" http://127.0.0.1:18080/api/v1/tasks
-curl -s http://127.0.0.1:18080/api/v1/tasks/$TID
-curl -s http://127.0.0.1:18080/api/v1/tasks/$TID/stages
+PORT=18083 DATA_DIR=.../data TMP_DIR=.../tmp ./server_b3.exe
+curl -s -X POST -F "video_file=@tiny.mp4" http://127.0.0.1:18083/api/v1/tasks
+curl -s http://127.0.0.1:18083/api/v1/tasks/$TID           # progress=30
+curl -s http://127.0.0.1:18083/api/v1/tasks/$TID/stages
 ```
-观测（真实任务，故意不选 summary profile 触发在 summary 阶段失败）：
-- import done(317ms) / audio done(1518ms) / fuse done(537ms) / summary failed(559ms，"未选择配置方案")
-- `GET /tasks/{id}` 返回 `progress=30`：恰为 import(10)+audio(10)+fuse(10)=30 的加权结果，符合预期（不再硬编码）。
-- 原始 JSON 见 `live_task.json`、`live_stages.json`。
+观测（真实任务，故意不选 summary profile 在 summary 阶段失败）：
+- import done(226ms) / audio done(525ms) / fuse done(582ms) / summary failed(612ms)
+- `GET /tasks/{id}` → status=failed, **progress=30**（=未完 summary 时已完成 import10+audio10+fuse10 的加权值；非事后补 100，因失败不清零）
+- 原始 JSON 见 `live_task.json` / `live_stages.json`
 
 ## 结论
-tasks.progress 已由 task_stages 加权聚合驱动，替换硬编码；单测覆盖各状态与单调性，运行中接口值合理（30%）。
+tasks.progress 已由 task_stages 加权聚合驱动，替换硬编码；单测 8/8 稳定全绿；运行中接口值真实反映完成比例（30%）。
