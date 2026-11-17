@@ -1,0 +1,18 @@
+﻿=== RUN   TestComputeProgress_Empty
+--- PASS: TestComputeProgress_Empty (0.00s)
+=== RUN   TestComputeProgress_AllDone
+--- PASS: TestComputeProgress_AllDone (0.00s)
+=== RUN   TestComputeProgress_SkippedCountsDone
+--- PASS: TestComputeProgress_SkippedCountsDone (0.00s)
+=== RUN   TestComputeProgress_Partial
+--- PASS: TestComputeProgress_Partial (0.00s)
+=== RUN   TestComputeProgress_Failed
+--- PASS: TestComputeProgress_Failed (0.00s)
+=== RUN   TestComputeProgress_Clamp
+--- PASS: TestComputeProgress_Clamp (0.00s)
+=== RUN   TestRecomputeTaskProgress_Persisted
+--- PASS: TestRecomputeTaskProgress_Persisted (0.30s)
+=== RUN   TestStageWeightsSum100
+--- PASS: TestStageWeightsSum100 (0.00s)
+PASS
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/db	(cached)
