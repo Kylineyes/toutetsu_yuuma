@@ -1,5 +1,14 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
+import { onMounted } from 'vue'
+import { api } from './api.js'
+
+onMounted(async () => {
+  try {
+    const s = await api.getSettings()
+    if (s.api_token) localStorage.setItem('api_token', s.api_token)
+  } catch (e) { /* ignore */ }
+})
 </script>
 
 <template>
@@ -12,6 +21,7 @@ import { RouterLink, RouterView } from 'vue-router'
         <RouterLink to="/tasks/new">新建任务</RouterLink>
         <RouterLink to="/profiles">配置方案</RouterLink>
         <RouterLink to="/knowledge-bases">知识库</RouterLink>
+        <RouterLink to="/settings">设置</RouterLink>
       </nav>
     </aside>
     <main class="content">

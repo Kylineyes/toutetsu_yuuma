@@ -6,6 +6,7 @@ import TaskCreate from './views/TaskCreate.vue'
 import TaskDetail from './views/TaskDetail.vue'
 import ProfilesView from './views/ProfilesView.vue'
 import KnowledgeBasesView from './views/KnowledgeBasesView.vue'
+import SettingsView from './views/SettingsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -16,6 +17,7 @@ const router = createRouter({
     { path: '/tasks/:id', component: TaskDetail, props: true },
     { path: '/profiles', component: ProfilesView },
     { path: '/knowledge-bases', component: KnowledgeBasesView },
+    { path: '/settings', component: SettingsView },
   ],
 })
 

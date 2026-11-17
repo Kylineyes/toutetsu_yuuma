@@ -297,6 +297,25 @@ func (d *DB) ListTaskKBs(taskID string) ([]TaskKB, error) {
 	return out, rows.Err()
 }
 
+// ---------------- settings ----------------
+
+// GetSetting returns the value for key, or "" if absent.
+func (d *DB) GetSetting(key string) (string, error) {
+	var v string
+	err := d.QueryRow(`SELECT value FROM settings WHERE key=?`, key).Scan(&v)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return v, err
+}
+
+// SetSetting upserts a key/value.
+func (d *DB) SetSetting(key, value string) error {
+	_, err := d.Exec(`INSERT INTO settings(key,value) VALUES(?,?)
+		ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
+	return err
+}
+
 func boolToInt(b bool) int {
 	if b {
 		return 1

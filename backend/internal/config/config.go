@@ -9,7 +9,6 @@ import (
 type Config struct {
 	Port                     string
 	DataDir                  string
-	APIToken                 string // optional; if set, all /api requests must send it
 	DefaultScreenshotInterval int   // seconds
 	MaxFrames                int   // max frames per task
 	Timezone                 string
@@ -36,7 +35,6 @@ func Load() *Config {
 	return &Config{
 		Port:                      getenv("PORT", "8080"),
 		DataDir:                   getenv("DATA_DIR", "./data"),
-		APIToken:                  getenv("API_TOKEN", ""),
 		DefaultScreenshotInterval: getint("DEFAULT_SCREENSHOT_INTERVAL", 60),
 		MaxFrames:                 getint("MAX_FRAMES", 120),
 		Timezone:                  getenv("TZ", "Asia/Shanghai"),

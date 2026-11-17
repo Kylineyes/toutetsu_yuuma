@@ -32,6 +32,8 @@ func (a *API) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", a.handleHealth)
 	mux.HandleFunc("GET /api/v1/meta", a.handleMeta)
+	mux.HandleFunc("GET /api/v1/settings", a.getSettings)
+	mux.HandleFunc("PUT /api/v1/settings", a.putSettings)
 
 	mux.HandleFunc("GET /api/v1/profiles", a.listProfiles)
 	mux.HandleFunc("POST /api/v1/profiles", a.createProfile)
@@ -60,18 +62,30 @@ func (a *API) Routes() http.Handler {
 
 func (a *API) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") && a.Cfg.APIToken != "" {
-			tok := r.Header.Get("X-API-Token")
-			if tok == "" {
-				tok = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-			}
-			if tok != a.Cfg.APIToken {
-				writeErr(w, http.StatusUnauthorized, "invalid api token")
-				return
+		if strings.HasPrefix(r.URL.Path, "/api/") && !exemptPath(r.URL.Path) {
+			// api_token 明文存放在 DB 的 settings 表
+			token, _ := a.DB.GetSetting("api_token")
+			if token != "" {
+				tok := r.Header.Get("X-API-Token")
+				if tok == "" {
+					tok = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+				}
+				if tok == "" {
+					tok = r.URL.Query().Get("token")
+				}
+				if tok != token {
+					writeErr(w, http.StatusUnauthorized, "invalid api token")
+					return
+				}
 			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// exemptPath: health 与 settings 永远免鉴权（便于初次设置令牌）。
+func exemptPath(p string) bool {
+	return p == "/api/v1/health" || strings.HasPrefix(p, "/api/v1/settings")
 }
 
 // helpers
@@ -124,6 +138,30 @@ func (a *API) handleMeta(w http.ResponseWriter, r *http.Request) {
 		"capabilities":                []string{"summary", "asr", "vision", "reading"},
 		"default_reading_depth":       2,
 	})
+}
+
+// ---------------- settings ----------------
+
+// getSettings returns the stored api_token (plaintext, by design).
+func (a *API) getSettings(w http.ResponseWriter, r *http.Request) {
+	token, _ := a.DB.GetSetting("api_token")
+	writeJSON(w, 200, map[string]string{"api_token": token})
+}
+
+// putSettings upserts settings; currently only api_token. Empty string clears it.
+func (a *API) putSettings(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		APIToken string `json:"api_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	if err := a.DB.SetSetting("api_token", strings.TrimSpace(body.APIToken)); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]string{"status": "ok"})
 }
 
 // ---------------- profiles ----------------

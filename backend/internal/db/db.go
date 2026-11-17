@@ -95,6 +95,10 @@ func (d *DB) Migrate() error {
 			version INTEGER NOT NULL,
 			priority INTEGER NOT NULL DEFAULT 0
 		)`,
+		`CREATE TABLE IF NOT EXISTS settings (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL
+		)`,
 	}
 	for _, s := range stmts {
 		if _, err := d.Exec(s); err != nil {

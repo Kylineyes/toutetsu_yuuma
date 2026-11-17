@@ -61,10 +61,13 @@ npm install && npm run dev        # http://localhost:5173 （已代理 /api → 
 | --- | --- | --- |
 | PORT | 8080 | 监听端口 |
 | DATA_DIR | ./data | 数据根目录（db / task / knowledge-bases） |
-| API_TOKEN | 空 | 设置后所有 /api 请求需带 X-API-Token（或 Authorization: Bearer）|
 | DEFAULT_SCREENSHOT_INTERVAL | 60 | 默认截图间隔（秒）|
 | MAX_FRAMES | 120 | 单任务最多截帧数 |
 | TZ | Asia/Shanghai | 时区 |
+
+## 鉴权（API Token）
+
+API Token **不使用环境变量**，而是**明文存储于数据库 `settings` 表**（`key=api_token`）。可通过前端「设置」页或 `PUT /api/v1/settings` 设置；`GET /api/v1/settings` 读取。设置后，除 `/health`、`/settings` 外的所有 `/api` 请求需带 `X-API-Token`（或 `Authorization: Bearer`，下载文件也支持 `?token=`）。留空则不启用鉴权。
 
 ## 配置方案（Profile）
 
@@ -85,6 +88,8 @@ npm install && npm run dev        # http://localhost:5173 （已代理 /api → 
 | --- | --- | --- |
 | GET | /health | 健康检查 |
 | GET | /meta | 支持格式、默认参数 |
+| GET | /settings | 读取设置（含明文 api_token）|
+| PUT | /settings | 保存设置（api_token，明文存 DB）|
 | GET/POST | /profiles?capability= | 方案列表/新建 |
 | GET/PUT/DELETE | /profiles/{id} | 方案详情/更新/删除 |
 | GET/POST | /knowledge-bases | 知识库列表/新建 |
