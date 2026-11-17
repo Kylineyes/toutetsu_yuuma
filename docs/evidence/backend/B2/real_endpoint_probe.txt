@@ -1,0 +1,15 @@
+=== 真实端点实测（magpie http://<部署机IP>:30131, model workbuddy/deepseek-v4.1-flash）===
+说明：magpie 实测同时支持 openai_chat / openai_responses / anthropic_messages / gemini 四种 chat 协议；ASR 无通道。
+
+=== openai_chat ===
+OK text=[你好] prompt=41 completion=67
+=== openai_responses ===
+OK text=[你好] prompt=41 completion=2
+=== anthropic_messages ===
+OK text=[你好] prompt=41 completion=2
+=== gemini ===
+OK text=[你好] prompt=41 completion=2
+
+=== ASR（真实端点无通道）===
+{"error":{"code":null,"message":"magpie serves /v1/chat/completions, /v1/responses, /v1/messages, /v1/systemone, /v1/images/generations, /v1/images/edits, /v1/videos, /v1/embeddings, /v1/rerank, /v1/audio/transcriptions, /v1/audio/translations, /v1/audio/speech and /v1beta/models/*","param":null,"type":"not_found_error"}}
+ [HTTP 404]

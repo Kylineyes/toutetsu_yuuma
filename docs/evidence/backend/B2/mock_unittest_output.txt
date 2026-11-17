@@ -1,0 +1,18 @@
+﻿=== RUN   TestProtocol_OpenAIChat
+--- PASS: TestProtocol_OpenAIChat (0.00s)
+=== RUN   TestProtocol_OpenAIResponses
+--- PASS: TestProtocol_OpenAIResponses (0.00s)
+=== RUN   TestProtocol_Anthropic
+--- PASS: TestProtocol_Anthropic (0.00s)
+=== RUN   TestProtocol_Gemini
+--- PASS: TestProtocol_Gemini (0.00s)
+=== RUN   TestProtocol_ASRDeepSeek
+--- PASS: TestProtocol_ASRDeepSeek (0.00s)
+=== RUN   TestProtocol_ASROpenAI
+--- PASS: TestProtocol_ASROpenAI (0.00s)
+=== RUN   TestProtocol_GeminiSkipsThought
+--- PASS: TestProtocol_GeminiSkipsThought (0.00s)
+=== RUN   TestProtocol_HTTPError
+--- PASS: TestProtocol_HTTPError (0.00s)
+PASS
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/deepseek	0.067s
