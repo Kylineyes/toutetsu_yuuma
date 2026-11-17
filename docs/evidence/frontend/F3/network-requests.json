@@ -1,0 +1,12 @@
+[
+  {
+    "m": "POST",
+    "u": "/api/v1/profiles",
+    "s": 201
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/profiles",
+    "s": 200
+  }
+]

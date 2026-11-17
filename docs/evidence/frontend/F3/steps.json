@@ -1,0 +1,46 @@
+[
+  {
+    "step": "1_协议随能力切换",
+    "summaryOpts": [
+      "OpenAI Chat Completions",
+      "OpenAI Responses",
+      "Anthropic Messages",
+      "Gemini API"
+    ],
+    "asrOpts": [
+      "DeepSeek ASR (/v1/tools/asr)",
+      "OpenAI Audio (/v1/audio/transcriptions)",
+      "OpenAI Whisper（兼容）"
+    ],
+    "asrDefaultProto": "deepseek_asr",
+    "pass": true
+  },
+  {
+    "step": "2_温度越界",
+    "errShown": "温度须为 0~2 之间的数字，或留空使用默认",
+    "pass": true
+  },
+  {
+    "step": "3_超时非法",
+    "errShown": "超时须为正整数秒",
+    "pass": true
+  },
+  {
+    "step": "4_extra非法",
+    "errShown": "extra 不是合法 JSON：Expected property name or '}' in JSON at position 1 (line 1 column 2)",
+    "pass": true
+  },
+  {
+    "step": "5_合法创建回显",
+    "createReq": [
+      {
+        "m": "POST",
+        "u": "/api/v1/profiles",
+        "s": 201
+      }
+    ],
+    "rowText": "1\tF3-echo\topenai_chat\tdeepseek-flash\t0.7\t99s\t{\"top_p\":0.9}\thttps://api.deepseek.com\t删除",
+    "errAfter": "",
+    "pass": true
+  }
+]
