@@ -1,0 +1,12 @@
+﻿=== RUN   TestListKBs_EmptyIsArray
+--- PASS: TestListKBs_EmptyIsArray (0.05s)
+=== RUN   TestListProfiles_EmptyIsArray
+--- PASS: TestListProfiles_EmptyIsArray (0.05s)
+=== RUN   TestListTasks_EmptyIsArray
+--- PASS: TestListTasks_EmptyIsArray (0.05s)
+=== RUN   TestNormalizeNilSlice
+--- PASS: TestNormalizeNilSlice (0.00s)
+=== RUN   TestWriteJSON_NilSliceIsArray
+--- PASS: TestWriteJSON_NilSliceIsArray (0.00s)
+PASS
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/api	(cached)
