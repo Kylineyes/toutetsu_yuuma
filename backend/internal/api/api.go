@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -120,7 +121,24 @@ func (a *API) validSession(r *http.Request) bool {
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(normalizeNilSlice(v))
+}
+
+// normalizeNilSlice 将 nil 切片替换为同类型的空切片，确保 JSON 编码为 [] 而非 null。
+// 仅处理"切片"类型（含带方法的命名切片类型）；map/结构体/指针等其它 nil 语义保持不变。
+func normalizeNilSlice(v any) any {
+	if v == nil {
+		return v
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Slice {
+		return v
+	}
+	if !rv.IsNil() {
+		return v
+	}
+	// 用 reflect.New(sliceType).Elem() 得到该切片类型的零值（非 nil 空切片）。
+	return reflect.MakeSlice(rv.Type(), 0, 0).Interface()
 }
 func writeErr(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
