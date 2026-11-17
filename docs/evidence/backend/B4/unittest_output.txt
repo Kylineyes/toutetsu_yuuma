@@ -1,0 +1,8 @@
+﻿=== RUN   TestStageStatus
+--- PASS: TestStageStatus (0.06s)
+=== RUN   TestResetNonDoneStages
+--- PASS: TestResetNonDoneStages (0.06s)
+=== RUN   TestResetNonDoneStages_SkippedKept
+--- PASS: TestResetNonDoneStages_SkippedKept (0.05s)
+PASS
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/db	(cached)

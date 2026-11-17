@@ -1,0 +1,15 @@
+=== 断点续跑：重跑时跳过已完成阶段的服务端日志（真实运行 PORT=18084）===
+2026/11/18 05:31:55 [pipeline] task=1794951096619237900-51096 跳过 import（已完成）
+2026/11/18 05:31:55 [pipeline] task=1794951096619237900-51096 跳过 audio（已完成）
+2026/11/18 05:31:55 [pipeline] task=1794951096619237900-51096 跳过 fuse（已完成），从 fused.srt 恢复
+
+# 重跑（POST /tasks/{id}/retry）响应：
+{"resumed_from":["import","audio","fuse"],"status":"queued"}
+
+# 重跑后 stages（import/audio/fuse 的 started_at/finished_at/duration_ms 与首次运行完全相同，证明未重跑；仅 summary 重新执行）：
+import  done 634ms  started 05:31:36 (首次)
+audio   done 906ms  started 05:31:36 (首次)
+fuse    done 920ms  started 05:31:36 (首次)
+summary done 10044ms started 05:31:55 (重跑时执行)
+
+# 任务终态：status=done progress=100

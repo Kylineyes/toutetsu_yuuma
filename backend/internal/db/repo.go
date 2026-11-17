@@ -431,10 +431,50 @@ func (d *DB) ListTaskKBs(taskID string) ([]TaskKB, error) {
 	return out, rows.Err()
 }
 
-// DeleteTaskStages clears all stage rows for a task (used on retry).
+// DeleteTaskStages clears all stage rows for a task (full reset).
 func (d *DB) DeleteTaskStages(taskID string) error {
 	_, err := d.Exec(`DELETE FROM task_stages WHERE task_id=?`, taskID)
 	return err
+}
+
+// StageStatus 返回某阶段当前状态；不存在返回空字符串。
+func (d *DB) StageStatus(taskID, stage string) (string, error) {
+	var st string
+	err := d.QueryRow(`SELECT status FROM task_stages WHERE task_id=? AND stage=?`, taskID, stage).Scan(&st)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return st, err
+}
+
+// ResetNonDoneStages 删除除 done/skipped 之外的阶段记录，用于断点续跑：保留已完成阶段以便跳过。
+// 返回被保留（已完成）的阶段名列表，便于日志/证据。
+func (d *DB) ResetNonDoneStages(taskID string) ([]string, error) {
+	rows, err := d.Query(`SELECT stage,status FROM task_stages WHERE task_id=? ORDER BY id`, taskID)
+	if err != nil {
+		return nil, err
+	}
+	var kept []string
+	var toDelete []string
+	for rows.Next() {
+		var stage, status string
+		if err := rows.Scan(&stage, &status); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if status == "done" || status == "skipped" {
+			kept = append(kept, stage)
+		} else {
+			toDelete = append(toDelete, stage)
+		}
+	}
+	rows.Close()
+	for _, stage := range toDelete {
+		if _, err := d.Exec(`DELETE FROM task_stages WHERE task_id=? AND stage=?`, taskID, stage); err != nil {
+			return nil, err
+		}
+	}
+	return kept, nil
 }
 
 func boolToInt(b bool) int {
