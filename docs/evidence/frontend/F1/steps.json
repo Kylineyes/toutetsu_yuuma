@@ -1,0 +1,96 @@
+[
+  {
+    "step": "1_未登录访问tasks",
+    "finalUrl": "http://127.0.0.1:5173/login",
+    "pass": true,
+    "net": [
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:5173/api/v1/session",
+        "status": 200
+      }
+    ]
+  },
+  {
+    "step": "2_错误密码",
+    "errShown": "密码错误",
+    "pass": true,
+    "net": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:5173/api/v1/login",
+        "status": 401
+      }
+    ]
+  },
+  {
+    "step": "3_登录成功",
+    "finalUrl": "http://127.0.0.1:5173/tasks",
+    "cookie": {
+      "name": "session",
+      "httpOnly": true,
+      "sameSite": "Lax",
+      "hasValue": true
+    },
+    "pass": true,
+    "net": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:5173/api/v1/login",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:5173/api/v1/session",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:5173/api/v1/tasks",
+        "status": 200
+      }
+    ]
+  },
+  {
+    "step": "4_刷新保持登录",
+    "finalUrl": "http://127.0.0.1:5173/tasks",
+    "pass": true,
+    "net": [
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:5173/api/v1/session",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:5173/api/v1/tasks",
+        "status": 200
+      }
+    ]
+  },
+  {
+    "step": "5_退出登录",
+    "finalUrl": "http://127.0.0.1:5173/login",
+    "cookieAfter": "removed",
+    "pass": true,
+    "net": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:5173/api/v1/logout",
+        "status": 200
+      }
+    ]
+  },
+  {
+    "step": "6_退出后访问tasks",
+    "finalUrl": "http://127.0.0.1:5173/login",
+    "pass": true,
+    "net": [
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:5173/api/v1/session",
+        "status": 200
+      }
+    ]
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "method": "GET",
+    "url": "http://127.0.0.1:5173/api/v1/session",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "http://127.0.0.1:5173/api/v1/login",
+    "status": 401
+  },
+  {
+    "method": "POST",
+    "url": "http://127.0.0.1:5173/api/v1/login",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "http://127.0.0.1:5173/api/v1/session",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "http://127.0.0.1:5173/api/v1/tasks",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "http://127.0.0.1:5173/api/v1/session",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "http://127.0.0.1:5173/api/v1/tasks",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "http://127.0.0.1:5173/api/v1/logout",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "http://127.0.0.1:5173/api/v1/session",
+    "status": 200
+  }
+]
