@@ -1,0 +1,38 @@
+﻿# V3 构建复跑证据（隔离 worktree ver_wt，基线 commit a98f87e）
+时间: 2026-11-18T05:11:38+08:00
+worktree: <工作目录>\ver_wt  分支: verify/v3-v4-audit
+commit: a98f87ebba83a657273fc4bbfa4957394af32eee
+Go: go version go1.27.4 windows/amd64 | node: v26.13.1 | npm: 12.0.2
+
+## go build ./...   (worktree backend @ a98f87e)
+
+BUILD_EXIT=0
+## go vet ./...   (worktree backend @ a98f87e)
+
+VET_EXIT=0
+
+# 复用主工作区已安装依赖(因 npm ci 受 EALLOWREMOTE 限制被沙箱拦截)
+node_modules 已复制: True
+## npm run build   (worktree frontend @ a98f87e)
+node.exe : npm notice run toutetsu-yuuma-frontend@0.1.0 build
+所在位置 %USERPROFILE%\scoop\apps\nodejs-lts\current\bin\npm.ps1:24 字符: 5
++     & "node$exe"  "$basedir/node_modules/npm/bin/npm-cli.js" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run ...end@0.1.0 build:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run vite build
+vite v5.4.21 building for production...
+transforming...
+✓ 32 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.42 kB │ gzip:  0.31 kB
+dist/assets/index-C-wctoaI.css    1.92 kB │ gzip:  0.82 kB
+dist/assets/index-B7RMSnCn.js   120.09 kB │ gzip: 45.33 kB
+✓ built in 770ms
+NPMBUILD_EXIT=0
+## dist 产物
+dist\index.html  429 bytes
+dist\assets\index-B7RMSnCn.js  121284 bytes
+dist\assets\index-C-wctoaI.css  1918 bytes
