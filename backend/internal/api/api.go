@@ -47,6 +47,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/knowledge-bases/{id}/versions", a.listKBVersions)
 	mux.HandleFunc("POST /api/v1/knowledge-bases/{id}/versions", a.uploadKBVersion)
 	mux.HandleFunc("GET /api/v1/knowledge-bases/{id}/versions/{v}", a.getKBVersion)
+	mux.HandleFunc("GET /api/v1/knowledge-bases/{id}/versions/{v}/file", a.downloadKBVersion)
 	mux.HandleFunc("DELETE /api/v1/knowledge-bases/{id}/versions/{v}", a.deleteKBVersion)
 
 	mux.HandleFunc("POST /api/v1/tasks", a.createTask)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -150,4 +151,32 @@ func (a *API) deleteKBVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]string{"status": "ok"})
+}
+
+// downloadKBVersion streams a version's original term file as an attachment.
+func (a *API) downloadKBVersion(w http.ResponseWriter, r *http.Request) {
+	id := atoiDefault(r.PathValue("id"), 0)
+	v, _ := strconv.Atoi(r.PathValue("v"))
+	kv, err := a.DB.GetKBVersion(id, v)
+	if err != nil {
+		writeErr(w, 404, "版本不存在")
+		return
+	}
+	name, data, err := pipeline.ReadVersionFile(a.Cfg.DataDir, kv.DirPath)
+	if err != nil {
+		writeErr(w, 404, "版本文件不存在")
+		return
+	}
+	if name == "" {
+		name = kv.FileName
+	}
+	if name == "" {
+		name = "knowledge-base-v" + strconv.Itoa(v) + ".txt"
+	}
+	// RFC 5987 兼容非 ASCII 文件名
+	w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(name))
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.WriteHeader(200)
+	_, _ = w.Write(data)
 }

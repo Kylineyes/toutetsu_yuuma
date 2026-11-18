@@ -87,6 +87,28 @@ func LoadTermsFromVersion(versionDir string) ([]subtitle.Term, error) {
 	return terms, nil
 }
 
+// ReadVersionFile returns the original file name and content of a version's main file
+// (the first entry in its manifest), resolving the content-addressed blob.
+func ReadVersionFile(dataDir, versionDir string) (string, []byte, error) {
+	raw, err := os.ReadFile(filepath.Join(versionDir, "manifest.json"))
+	if err != nil {
+		return "", nil, err
+	}
+	var mf manifest
+	if err := json.Unmarshal(raw, &mf); err != nil {
+		return "", nil, err
+	}
+	if len(mf.Files) == 0 {
+		return "", nil, os.ErrNotExist
+	}
+	f := mf.Files[0]
+	data, err := os.ReadFile(blobPath(dataDir, f.SHA256))
+	if err != nil {
+		return f.Name, nil, err
+	}
+	return f.Name, data, nil
+}
+
 // CountTermsInVersion returns the number of terms in a version.
 func CountTermsInVersion(versionDir string) int {
 	t, _ := LoadTermsFromVersion(versionDir)
