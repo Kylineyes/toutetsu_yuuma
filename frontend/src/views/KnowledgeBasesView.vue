@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from '../api.js'
 
 const kbs = ref([])
@@ -7,6 +7,12 @@ const err = ref('')
 const newName = ref('')
 const versions = ref({}) // kbId -> list
 const uploadFiles = ref({}) // kbId -> File
+const query = ref('') // 名称搜索关键字
+const filteredKbs = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  if (!q) return kbs.value
+  return kbs.value.filter(kb => String(kb.name || '').toLowerCase().includes(q) || (('#' + kb.id).includes(q)) || String(kb.id) === q)
+})
 
 async function load() {
   try { const list = await api.kbs(); kbs.value = Array.isArray(list) ? list : [] } catch (e) { err.value = e.message }
@@ -47,6 +53,7 @@ function fmtSize(n) {
   if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB'
   return (n / 1024 / 1024).toFixed(2) + ' MB'
 }
+function dlVersion(kb, v) { return api.kbVersionFileUrl(kb.id, v.version) }
 onMounted(load)
 </script>
 
@@ -62,7 +69,16 @@ onMounted(load)
     </div>
   </div>
 
-  <div v-for="kb in kbs" :key="kb.id" class="card">
+  <div class="card">
+    <div class="row">
+      <label class="fld" style="flex:1">搜索知识库名称<input v-model="query" placeholder="输入名称关键字筛选" /></label>
+      <span style="color:#64748b;align-self:flex-end">共 {{ kbs.length }} 个，匹配 {{ filteredKbs.length }} 个</span>
+    </div>
+  </div>
+
+  <div v-if="query.trim() && filteredKbs.length === 0" class="card" style="color:#64748b">没有匹配「{{ query }}」的知识库</div>
+
+  <div v-for="kb in filteredKbs" :key="kb.id" class="card">
     <div class="row" style="justify-content:space-between">
       <div><strong>#{{ kb.id }} {{ kb.name }}</strong> <span class="tag">最新 v{{ kb.latest_version }}</span></div>
       <div class="row" style="margin:0">
@@ -73,13 +89,13 @@ onMounted(load)
       </div>
     </div>
     <table v-if="versions[kb.id]">
-      <thead><tr><th>版本</th><th>文件</th><th>术语数</th><th>大小</th><th>sha256</th><th>时间</th><th></th></tr></thead>
+      <thead><tr><th>版本</th><th>文件</th><th>术语数</th><th>大小</th><th>sha256</th><th>时间</th><th>操作</th></tr></thead>
       <tbody>
         <tr v-for="v in versions[kb.id]" :key="v.id">
           <td>v{{ v.version }} <span v-if="v.version === kb.latest_version" class="tag done">最新</span></td><td>{{ v.file_name }}</td><td>{{ v.term_count }}</td>
           <td>{{ fmtSize(v.size_bytes) }}</td>
           <td style="font-family:monospace;font-size:11px">{{ (v.sha256||'').slice(0,16) }}…</td><td>{{ v.created_at }}</td>
-          <td><button class="danger" :disabled="v.version === kb.latest_version" @click="delVersion(kb, v)">删除</button></td>
+          <td class="row" style="margin:0;gap:6px"><a :href="dlVersion(kb, v)" target="_blank"><button class="ghost">下载</button></a><button class="danger" :disabled="v.version === kb.latest_version" @click="delVersion(kb, v)">删除</button></td>
         </tr>
       </tbody>
     </table>

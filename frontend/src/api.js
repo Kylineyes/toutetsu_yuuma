@@ -27,6 +27,7 @@ export const api = {
   kbVersions: (id) => fetch(`${base}/knowledge-bases/${id}/versions`).then(handle),
   uploadKB: (id, fd) => fetch(`${base}/knowledge-bases/${id}/versions`, { method: 'POST', body: fd }).then(handle),
   deleteKBVersion: (id, v) => fetch(`${base}/knowledge-bases/${id}/versions/${v}`, { method: 'DELETE' }).then(handle),
+  kbVersionFileUrl: (id, v) => `${base}/knowledge-bases/${id}/versions/${v}/file`,
 
   tasks: () => fetch(base + '/tasks').then(handle),
   task: (id) => fetch(`${base}/tasks/${id}`).then(handle),
