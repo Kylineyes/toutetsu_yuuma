@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
+import './styles/tokens.css'
+import './styles/base.css'
 import LoginView from './views/LoginView.vue'
 import TasksView from './views/TasksView.vue'
 import TaskCreate from './views/TaskCreate.vue'

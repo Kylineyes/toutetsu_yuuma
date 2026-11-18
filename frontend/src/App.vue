@@ -1,60 +1,54 @@
 <script setup>
-import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { api } from './api.js'
+import UiIcon from './components/UiIcon.vue'
+import ThemeToggle from './components/ThemeToggle.vue'
 
+const route = useRoute()
 const router = useRouter()
+const nav = [
+  { to: '/tasks', label: '任务列表', icon: 'tasks' },
+  { to: '/tasks/new', label: '新建任务', icon: 'plus' },
+  { to: '/profiles', label: '配置方案', icon: 'profile' },
+  { to: '/knowledge-bases', label: '知识库', icon: 'knowledge' },
+]
 async function logout() {
-  try { await api.logout() } catch (e) {}
+  try { await api.logout() } catch (e) { /* 服务端不可达时仍清理当前页面会话 */ }
   router.push('/login')
 }
 </script>
 
 <template>
-  <div class="app">
+  <div v-if="route.path === '/login'" class="app">
+    <RouterView />
+    <ThemeToggle class="theme-floating" />
+  </div>
+  <div v-else class="app">
     <aside class="sidebar">
-      <h1>toutetsu_yuuma</h1>
-      <p class="sub">视频阅读 · 总结 + 知识点</p>
-      <nav>
-        <RouterLink to="/tasks">任务</RouterLink>
-        <RouterLink to="/tasks/new">新建任务</RouterLink>
-        <RouterLink to="/profiles">配置方案</RouterLink>
-        <RouterLink to="/knowledge-bases">知识库</RouterLink>
+      <RouterLink class="brand" to="/tasks" aria-label="返回任务列表">
+        <span class="brand-mark" aria-hidden="true">TY</span>
+        <div>
+          <p class="brand-name">toutetsu_yuuma</p>
+          <p class="brand-tagline">视频阅读工作台</p>
+        </div>
+      </RouterLink>
+      <p class="nav-label">工作空间</p>
+      <nav class="sidebar-nav" aria-label="主导航">
+        <RouterLink v-for="item in nav" :key="item.to" class="nav-item" :to="item.to">
+          <UiIcon :name="item.icon" />
+          <span>{{ item.label }}</span>
+        </RouterLink>
       </nav>
-      <button class="ghost" style="margin-top:16px;width:100%" @click="logout">退出登录</button>
+      <div class="sidebar-footer">
+        <ThemeToggle />
+        <button class="button button-ghost" type="button" @click="logout">
+          <UiIcon name="logout" /><span class="button-label">退出登录</span>
+        </button>
+        <p class="sidebar-footer-meta">总结 · 知识卡 · 用语库</p>
+      </div>
     </aside>
     <main class="content">
-      <RouterView />
+      <div class="content-inner"><RouterView /></div>
     </main>
   </div>
 </template>
-
-<style>
-* { box-sizing: border-box; }
-body { margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2937; background: #f8fafc; }
-.app { display: flex; min-height: 100vh; }
-.sidebar { width: 220px; background: #0f172a; color: #e2e8f0; padding: 20px 16px; flex-shrink: 0; }
-.sidebar h1 { font-size: 16px; margin: 0 0 4px; }
-.sidebar .sub { font-size: 12px; color: #94a3b8; margin: 0 0 20px; }
-.sidebar nav { display: flex; flex-direction: column; gap: 6px; }
-.sidebar nav a { color: #cbd5e1; text-decoration: none; padding: 8px 10px; border-radius: 6px; font-size: 14px; }
-.sidebar nav a.router-link-active { background: #1e293b; color: #fff; }
-.content { flex: 1; padding: 28px 36px; max-width: 1100px; }
-h2 { margin-top: 0; }
-input, select, textarea { font: inherit; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
-button { font: inherit; padding: 7px 14px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; cursor: pointer; }
-button.danger { background: #dc2626; }
-button.ghost { background: #e2e8f0; color: #0f172a; }
-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eef2f7; font-size: 14px; vertical-align: top; }
-th { background: #f1f5f9; font-weight: 600; }
-.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin-bottom: 18px; }
-.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
-label.fld { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #475569; }
-.tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #e2e8f0; }
-.tag.done { background: #dcfce7; color: #166534; }
-.tag.failed { background: #fee2e2; color: #991b1b; }
-.tag.running { background: #dbeafe; color: #1e40af; }
-.tag.pending { background: #f1f5f9; color: #334155; }
-.tag.skipped { background: #fef9c3; color: #854d0e; }
-pre.md { white-space: pre-wrap; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
-</style>
