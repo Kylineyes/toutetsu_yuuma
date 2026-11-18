@@ -57,3 +57,22 @@
 - **可合 main。** 全部功能/构建/契约/UI/本地端到端验证通过；此前的空库白屏缺陷已修复并复验。
 - Docker 容器构建与真实 AI ASR 属**已知环境/能力缺口**，不影响代码质量结论；建议上线前在有 Docker/有 Key 环境补最终验证。
 - 依 AGENTS §7：dev→main 由用户执行，代理不触碰 main / 不强推。
+
+---
+
+## 附录 A：M3 Docker 容器验收（真机补验，2026-11-19）
+
+> 说明：本附录由「部署验收」在新虚拟机执行，独立于上文 Verification Agent 的 Windows 本机结论。上文所述「Docker 容器构建未验证」系当时开发机无 Docker 所致，现已在有 Docker 的机器上补齐。
+
+- **环境**：Debian 12 VM，Docker 28.5.2，Docker Compose v2.40.3；部署 `/home/<user>/project`（dev=eef61c8，随后合入 fix/docker-goproxy）。
+- **构建**：`docker compose build` 成功 → `project-backend`(555MB) + `project-frontend`(48.4MB)，BUILD_EXIT=0。
+  - 构建期修复：后端 Dockerfile 增加 `ARG/ENV GOPROXY`（默认 https://goproxy.cn,direct），解决受限网络下 `go mod download` 失败（原报 proxy.golang.org i/o timeout）。见提交 `3b7680f`。
+- **运行**：两容器 Up，backend 监听 0.0.0.0:8080、frontend 8088:80，数据卷 `./data:/data` 落盘。
+- **容器内端到端冒烟（PASS）**：health ok；login 错401/对200；session；空列表 knowledge-bases/profiles/tasks 均 `[]`（B7）；无 Cookie 401；真实 ffmpeg 流水线 import(done 862ms)+audio(done 1117ms)+fuse(done)，summary 因未选方案 failed(预期)，progress=30（B3 真实加权）；fused.srt 带 Cookie 200 / 无 Cookie 401；20MB 经 nginx 反代上传 201（client_max_body_size=2048m）；前端 8088 登录页真实浏览器渲染正常。
+- **证据**：`verify/M3/container-e2e.md`、`verify/M3/fe_login.png`。
+- **结论**：**M3 Docker 容器构建 + 容器内端到端 = PASS**。真实 AI（ASR/vision）仍为降级（无真实 Key），属能力缺口，不属本次 Docker 验收范围。
+
+### 合入 main 建议（更新）
+- 原「2 项缺口」中，**Docker 容器构建已补齐并 PASS**。
+- 仅剩 **真实 AI ASR/vision 缺真实 Key** 的能力缺口。
+- 结论：**可合 main**；真实 AI 链路可在拿到 Key 后再补验。
