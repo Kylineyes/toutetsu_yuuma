@@ -1,0 +1,17 @@
+=== B6 端到端边界验证（真实启动 PORT=18086, MAX_UPLOAD_BYTES=1(MB)）===
+# 1) 超大文件被拒（2MB > 1MB 上限）
+$ curl -s -w "HTTP %{http_code}" -X POST -F "video_file=@big.bin" http://127.0.0.1:18086/api/v1/tasks
+HTTP 413
+{"error":"上传内容超过大小上限"}
+
+# 2) 非法路径（文件名 ../../evil.mp4）被安全处理：清洗为 evil.mp4，落盘在 task/<id>/upload/video，无文件逃逸
+$ curl -s -X POST -F "video_file=@tiny.mp4;filename=../../evil.mp4" http://127.0.0.1:18086/api/v1/tasks
+{"id":"1794950769507533500-50769","status":"pending",...,"filename":"evil.mp4",...}
+# 逃逸检查：data 目录下 task/ 之外无 evil.mp4（输出为空）
+$ Get-ChildItem -Recurse _b6/data -Filter evil.mp4 | Where-Object { $_.FullName -notmatch '\\task\\' }
+(空)
+
+# 3) 临时文件清理生效：创建 tmp/intermediates/<id>/audio.wav 后调用 DELETE cache
+$ curl -s -X DELETE http://127.0.0.1:18086/api/v1/tasks/1794950769507533500-50769/cache
+{"cleaned":"..._b6\\tmp\\intermediates\\1794950769507533500-50769","status":"ok"}
+# 清理后目录存在性：False（已删除）

@@ -1,5 +1,9 @@
 # syntax=docker/dockerfile:1
 FROM golang:1.23-bookworm AS build
+# Go 模块代理，便于在受限网络（如无法直连 proxy.golang.org）环境下构建。
+# 可通过 docker build --build-arg GOPROXY=https://proxy.golang.org,direct 覆盖。
+ARG GOPROXY=https://goproxy.cn,direct
+ENV GOPROXY=${GOPROXY}
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

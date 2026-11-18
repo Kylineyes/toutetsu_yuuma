@@ -1,0 +1,17 @@
+[
+  {
+    "m": "POST",
+    "u": "/api/v1/knowledge-bases/3/versions",
+    "s": 201
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/knowledge-bases",
+    "s": 200
+  },
+  {
+    "m": "GET",
+    "u": "/api/v1/knowledge-bases/3/versions",
+    "s": 200
+  }
+]

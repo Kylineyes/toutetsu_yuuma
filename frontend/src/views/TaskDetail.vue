@@ -4,31 +4,32 @@ import { api } from '../api.js'
 
 const props = defineProps({ id: { type: String, required: true } })
 const task = ref(null)
+const stages = ref([])
 const result = ref(null)
 const err = ref('')
+const msg = ref('')
 let timer = null
 
 async function load() {
   try {
     task.value = await api.task(props.id)
-    if (task.value.status === 'done' || task.value.status === 'failed') {
+    stages.value = await api.taskStages(props.id) || []
+    if (['done', 'failed'].includes(task.value.status)) {
       result.value = await api.taskResult(props.id)
       if (timer) { clearInterval(timer); timer = null }
     }
   } catch (e) { err.value = e.message }
 }
+function start() { if (!timer) timer = setInterval(load, 3000) }
 async function retry() {
-  try { await api.retryTask(props.id); result.value = null; await load(); start() } catch (e) { err.value = e.message }
+  try { await api.retryTask(props.id); result.value = null; stages.value = []; await load(); start() } catch (e) { err.value = e.message }
 }
 async function cleanup() {
   if (!confirm('删除该任务的临时中间文件（tmp 缓存）？')) return
   try { await api.cleanupCache(props.id); msg.value = '已清理 tmp 缓存' } catch (e) { err.value = e.message }
 }
-const msg = ref('')
-function start() { if (!timer) timer = setInterval(load, 3000) }
 function dl(name) { return api.fileUrl(props.id, name) }
 const cost = computed(() => result.value?.cost || {})
-const subs = computed(() => result.value?.subtitles || [])
 onMounted(() => { load(); start() })
 onUnmounted(() => { if (timer) clearInterval(timer) })
 </script>
@@ -47,14 +48,31 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
     <div class="card">
       <div class="row">
         <span class="tag" :class="task.status">{{ task.status }}</span>
-        <span>阶段：{{ task.stage }}</span>
-        <span>进度：{{ task.progress }}%</span>
+        <span>总进度：{{ task.progress }}%</span>
+        <span style="color:#64748b;font-size:13px">视频：{{ task.filename }} ｜ T={{ task.reading_depth }} ｜ 截图间隔 {{ task.screenshot_interval }}s</span>
       </div>
       <div style="height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden">
         <div :style="{ width: task.progress + '%', height:'100%', background:'#2563eb' }"></div>
       </div>
       <p v-if="task.error" style="color:#b91c1c">{{ task.error }}</p>
-      <p style="color:#64748b;font-size:13px">视频：{{ task.filename }} ｜ 阅读深度 T={{ task.reading_depth }} ｜ 截图间隔 {{ task.screenshot_interval }}s</p>
+      <p style="color:#94a3b8;font-size:12px">开始：{{ task.started_at || '-' }} ｜ 结束：{{ task.finished_at || '-' }}</p>
+    </div>
+
+    <div class="card">
+      <h3>阶段（可并行）</h3>
+      <table>
+        <thead><tr><th>阶段</th><th>状态</th><th>进度</th><th>耗时</th><th>备注</th></tr></thead>
+        <tbody>
+          <tr v-for="s in stages" :key="s.id">
+            <td>{{ s.stage }}</td>
+            <td><span class="tag" :class="s.status">{{ s.status }}</span></td>
+            <td>{{ s.progress }}%</td>
+            <td>{{ s.duration_ms ? (s.duration_ms/1000).toFixed(1) + 's' : '-' }}</td>
+            <td style="color:#64748b">{{ s.message || s.error }}</td>
+          </tr>
+          <tr v-if="!stages.length"><td colspan="5" style="color:#94a3b8">暂无</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <div v-if="result" class="card">

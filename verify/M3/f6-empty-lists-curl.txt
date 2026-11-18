@@ -1,0 +1,12 @@
+﻿# F6/B7 空列表 curl 原始结果 (dev e606185，全新空 DATA_DIR)
+
+# login=200
+/api/v1/knowledge-bases => []
+/api/v1/profiles => []
+/api/v1/profiles?capability=summary => []
+/api/v1/profiles?capability=asr => []
+/api/v1/profiles?capability=vision => []
+/api/v1/profiles?capability=reading => []
+/api/v1/tasks => []
+
+结论：全部为空数组 []（非 null）。B7 normalizeNilSlice 生效。

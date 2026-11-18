@@ -22,16 +22,38 @@ const form = ref({
 const files = ref({ video: null, native: null, ai: null, vision: null, danmu: null })
 
 async function load() {
-  for (const c of caps) { try { profiles.value[c] = await api.profiles(c) } catch (e) {} }
-  try { kbs.value = await api.kbs() } catch (e) {}
+  // 后端在无数据时返回 JSON null，这里统一兜底为数组，避免模板 .length 抛错导致白屏
+  for (const c of caps) {
+    try {
+      const list = await api.profiles(c)
+      profiles.value[c] = Array.isArray(list) ? list : []
+    } catch (e) { profiles.value[c] = [] }
+  }
+  try {
+    const list = await api.kbs()
+    kbs.value = Array.isArray(list) ? list : []
+  } catch (e) { kbs.value = [] }
 }
 async function toggleKB(kb) {
-  if (selectedKBs.value[kb.id] !== undefined) { delete selectedKBs.value[kb.id]; return }
+  // 再次点击已选中的则取消选择
+  if (selectedKBs.value[kb.id] !== undefined) {
+    delete selectedKBs.value[kb.id]
+    delete versionsMap.value[kb.id]
+    return
+  }
+  if (!kb.latest_version) { err.value = '该知识库尚无版本，无法选择'; return }
   let vs = []
-  try { vs = await api.kbVersions(kb.id) } catch (e) {}
+  try { vs = (await api.kbVersions(kb.id)) || [] } catch (e) { vs = [] }
+  if (!Array.isArray(vs)) vs = []
   versionsMap.value[kb.id] = vs
   const latest = vs.length ? vs[0].version : kb.latest_version
   selectedKBs.value[kb.id] = latest
+}
+// 已选知识库的优先级序号（勾选顺序即 1..N）
+function kbPriority(kbId) {
+  const ids = Object.keys(selectedKBs.value)
+  const i = ids.indexOf(String(kbId))
+  return i < 0 ? 0 : i + 1
 }
 function submit() {
   err.value = ''
@@ -43,6 +65,11 @@ function submit() {
     if (!files.value.video) { err.value = '请选择视频文件'; return }
     fd.append('video_file', files.value.video)
   }
+  // 参数校验：截图间隔为正整数，阅读深度为非负整数
+  const si = Number(form.value.screenshot_interval)
+  if (!Number.isInteger(si) || si <= 0) { err.value = '截图间隔须为正整数秒'; return }
+  const rd = Number(form.value.reading_depth)
+  if (!Number.isInteger(rd) || rd < 0) { err.value = '阅读深度须为非负整数'; return }
   for (const k of ['native', 'ai', 'vision', 'danmu']) if (files.value[k]) fd.append('subtitle_' + k, files.value[k])
   fd.append('summary_profile_id', form.value.summary_profile_id || 0)
   fd.append('asr_profile_id', form.value.asr_profile_id || 0)
@@ -62,7 +89,7 @@ onMounted(load)
 
 <template>
   <h2>新建任务</h2>
-  <div v-if="err" class="card" style="color:#b91c1c">{{ err }}</div>
+  <div v-if="err" class="card err" style="color:#b91c1c">{{ err }}</div>
 
   <div class="card">
     <h3>视频源</h3>
@@ -123,7 +150,11 @@ onMounted(load)
   <div class="card">
     <h3>知识库（可多选，勾选顺序即优先级）</h3>
     <div class="row" v-for="kb in kbs" :key="kb.id">
-      <label><input type="checkbox" :checked="selectedKBs[kb.id] !== undefined" @change="toggleKB(kb)" /> {{ kb.name }}（最新 v{{ kb.latest_version }}）</label>
+      <label>
+        <input type="checkbox" :checked="selectedKBs[kb.id] !== undefined" @change="toggleKB(kb)" />
+        <span v-if="selectedKBs[kb.id] !== undefined" class="tag running" style="margin-right:4px">优先级 {{ kbPriority(kb.id) }}</span>
+        {{ kb.name }}（最新 v{{ kb.latest_version }}）
+      </label>
       <select v-if="selectedKBs[kb.id] !== undefined" v-model.number="selectedKBs[kb.id]">
         <option v-for="v in (versionsMap[kb.id] || [])" :key="v.id" :value="v.version">v{{ v.version }}（{{ v.term_count }} 词）</option>
       </select>

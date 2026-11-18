@@ -1,0 +1,80 @@
+[
+  {
+    "step": "0_任务列表列(D1)",
+    "headers": [
+      "任务",
+      "视频",
+      "状态",
+      "进度",
+      "创建时间",
+      ""
+    ],
+    "firstRowCells": [
+      "1794949957435665600-49957",
+      "x.mp4",
+      "failed",
+      "0%",
+      "2026-11-18T05:12:37+08:00",
+      "详情删除"
+    ],
+    "hasUndefined": false
+  },
+  {
+    "step": "1_详情页阶段表",
+    "stageText": "阶段\t状态\t进度\t耗时\t备注 | import\tfailed\t0%\t8.1s\t下载视频 HTTP 404"
+  },
+  {
+    "step": "2_阶段轮询",
+    "stagesReqIn7s": 0,
+    "taskReqIn7s": 0
+  },
+  {
+    "step": "3_重跑后轮询",
+    "stagesReqIn6_5s": 3
+  },
+  {
+    "step": "4_下载全部文件(带Cookie)",
+    "results": [
+      {
+        "name": "summary.md",
+        "status": 200,
+        "bytes": 115,
+        "head": "# 视频概述"
+      },
+      {
+        "name": "knowledge.md",
+        "status": 200,
+        "bytes": 55,
+        "head": "## 知识点卡片"
+      },
+      {
+        "name": "fused.srt",
+        "status": 200,
+        "bytes": 51,
+        "head": "1"
+      },
+      {
+        "name": "asr.srt",
+        "status": 200,
+        "bytes": 49,
+        "head": "1"
+      },
+      {
+        "name": "vision.srt",
+        "status": 200,
+        "bytes": 51,
+        "head": "1"
+      }
+    ]
+  },
+  {
+    "step": "5_无Cookie下载应401",
+    "status": 401
+  },
+  {
+    "step": "6_页面按钮",
+    "buttons": [
+      "退出登录"
+    ]
+  }
+]

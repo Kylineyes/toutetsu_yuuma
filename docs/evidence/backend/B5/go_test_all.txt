@@ -1,0 +1,77 @@
+﻿?   	github.com/Kylineyes/toutetsu_yuuma/backend/cmd/server	[no test files]
+=== RUN   TestExemptPath
+--- PASS: TestExemptPath (0.00s)
+=== RUN   TestSessionValueHMAC
+--- PASS: TestSessionValueHMAC (0.00s)
+=== RUN   TestAuth_TokenHeader
+--- PASS: TestAuth_TokenHeader (0.00s)
+=== RUN   TestAuth_BearerAndQuery
+--- PASS: TestAuth_BearerAndQuery (0.00s)
+=== RUN   TestAuth_SessionCookie
+--- PASS: TestAuth_SessionCookie (0.00s)
+=== RUN   TestAuth_Open
+--- PASS: TestAuth_Open (0.00s)
+=== RUN   TestAuth_ExemptPathsBypass
+--- PASS: TestAuth_ExemptPathsBypass (0.00s)
+=== RUN   TestAuth_NonAPI
+--- PASS: TestAuth_NonAPI (0.00s)
+PASS
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/api	0.081s
+?   	github.com/Kylineyes/toutetsu_yuuma/backend/internal/config	[no test files]
+=== RUN   TestComputeProgress_Empty
+--- PASS: TestComputeProgress_Empty (0.00s)
+=== RUN   TestComputeProgress_AllDone
+--- PASS: TestComputeProgress_AllDone (0.00s)
+=== RUN   TestComputeProgress_SkippedCountsDone
+--- PASS: TestComputeProgress_SkippedCountsDone (0.00s)
+=== RUN   TestComputeProgress_Partial
+--- PASS: TestComputeProgress_Partial (0.00s)
+=== RUN   TestComputeProgress_Failed
+--- PASS: TestComputeProgress_Failed (0.00s)
+=== RUN   TestComputeProgress_Clamp
+--- PASS: TestComputeProgress_Clamp (0.00s)
+=== RUN   TestRecomputeTaskProgress_Persisted
+--- PASS: TestRecomputeTaskProgress_Persisted (0.12s)
+=== RUN   TestStageWeightsSum100
+--- PASS: TestStageWeightsSum100 (0.00s)
+PASS
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/db	0.184s
+?   	github.com/Kylineyes/toutetsu_yuuma/backend/internal/deepseek	[no test files]
+?   	github.com/Kylineyes/toutetsu_yuuma/backend/internal/media	[no test files]
+=== RUN   TestIngestAndLoadCSV
+--- PASS: TestIngestAndLoadCSV (0.01s)
+=== RUN   TestIngestJSON
+--- PASS: TestIngestJSON (0.01s)
+=== RUN   TestContentAddressingDedupe
+--- PASS: TestContentAddressingDedupe (0.01s)
+=== RUN   TestDeleteVersionAndGC
+--- PASS: TestDeleteVersionAndGC (0.02s)
+PASS
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/pipeline	0.116s
+=== RUN   TestParseSRT
+--- PASS: TestParseSRT (0.00s)
+=== RUN   TestParseVTT
+--- PASS: TestParseVTT (0.00s)
+=== RUN   TestParseASS
+--- PASS: TestParseASS (0.00s)
+=== RUN   TestParseTXT
+--- PASS: TestParseTXT (0.00s)
+=== RUN   TestFormatSRTRoundtrip
+--- PASS: TestFormatSRTRoundtrip (0.00s)
+=== RUN   TestParseDanmuXML
+--- PASS: TestParseDanmuXML (0.00s)
+=== RUN   TestFusePriorityNativeWins
+--- PASS: TestFusePriorityNativeWins (0.00s)
+=== RUN   TestFuseASRGapFill
+--- PASS: TestFuseASRGapFill (0.00s)
+=== RUN   TestFuseVisionAppended
+--- PASS: TestFuseVisionAppended (0.00s)
+=== RUN   TestFuseDedupe
+--- PASS: TestFuseDedupe (0.00s)
+=== RUN   TestApplyTerms
+--- PASS: TestApplyTerms (0.00s)
+=== RUN   TestApplyTermsEmpty
+--- PASS: TestApplyTermsEmpty (0.00s)
+PASS
+ok  	github.com/Kylineyes/toutetsu_yuuma/backend/internal/subtitle	0.067s
+?   	github.com/Kylineyes/toutetsu_yuuma/backend/internal/worker	[no test files]

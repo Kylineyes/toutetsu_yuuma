@@ -1,0 +1,7 @@
+=== 真实启动空库 (PORT=18087) 各列表接口返回 ===
+=== knowledge-bases ===
+[]
+=== profiles ===
+[]
+=== tasks ===
+[]
