@@ -18,10 +18,12 @@
 | 配置与鉴权 | [docs/configuration.md](docs/configuration.md) | 环境变量、鉴权方式、配置方案 Profile |
 | API | [docs/api.md](docs/api.md) | /api/v1 接口表、新建任务 multipart 字段 |
 | v1 限制 | [docs/limitations.md](docs/limitations.md) | 当前版本能力边界 |
+| 单任务处理计划 | [docs/plans/README.md](docs/plans/README.md) | 一个 task 从素材到「总结 + 用语库」的完整设计与验收（ST0–ST8） |
 
 ## 其它文档
 
-- [视频处理流程图](docs/视频处理流程图.md)：任务从「被接受」到各处理阶段的完整流程
+- [视频处理流程图](docs/视频处理流程图.md)：任务从「被接受」到各处理阶段的完整流程（当前 v1 实现）
+- [单任务处理计划](docs/plans/README.md)：单任务流水线重设计（来源台账 → 质检融合 → 术语纠错 → 用语库 → 总结），含逐阶段验收矩阵
 - [交接报告](docs/交接报告.md)、[换机交接说明](docs/换机交接说明.md)：项目验收与接手说明
 - [AGENTS.md](docs/AGENTS.md)：协作与提交规范
 
