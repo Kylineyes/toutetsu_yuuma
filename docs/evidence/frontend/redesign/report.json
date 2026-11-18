@@ -1,0 +1,92 @@
+{
+  "base": "http://localhost:4173",
+  "themes": {
+    "light": [
+      {
+        "name": "login",
+        "themeAttr": "light",
+        "bg": "rgb(246, 247, 249)"
+      },
+      {
+        "name": "tasks",
+        "themeAttr": "light",
+        "bg": "rgb(246, 247, 249)"
+      },
+      {
+        "name": "tasks-new",
+        "themeAttr": "light",
+        "bg": "rgb(246, 247, 249)"
+      },
+      {
+        "name": "task-detail",
+        "themeAttr": "light",
+        "bg": "rgb(246, 247, 249)"
+      },
+      {
+        "name": "profiles",
+        "themeAttr": "light",
+        "bg": "rgb(246, 247, 249)"
+      },
+      {
+        "name": "knowledge-bases",
+        "themeAttr": "light",
+        "bg": "rgb(246, 247, 249)"
+      }
+    ],
+    "dark": [
+      {
+        "name": "login",
+        "themeAttr": "dark",
+        "bg": "rgb(17, 21, 28)"
+      },
+      {
+        "name": "tasks",
+        "themeAttr": "dark",
+        "bg": "rgb(17, 21, 28)"
+      },
+      {
+        "name": "tasks-new",
+        "themeAttr": "dark",
+        "bg": "rgb(17, 21, 28)"
+      },
+      {
+        "name": "task-detail",
+        "themeAttr": "dark",
+        "bg": "rgb(17, 21, 28)"
+      },
+      {
+        "name": "profiles",
+        "themeAttr": "dark",
+        "bg": "rgb(17, 21, 28)"
+      },
+      {
+        "name": "knowledge-bases",
+        "themeAttr": "dark",
+        "bg": "rgb(17, 21, 28)"
+      }
+    ]
+  },
+  "toggle": {
+    "initial": {
+      "theme": "light",
+      "stored": null
+    },
+    "afterToggle": {
+      "theme": "dark",
+      "stored": "dark"
+    },
+    "afterReload": {
+      "theme": "dark",
+      "stored": "dark"
+    },
+    "afterToggleBack": {
+      "theme": "light",
+      "stored": "light"
+    }
+  },
+  "mobile": {
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  "consoleErrors": []
+}

@@ -19,6 +19,7 @@
 | API | [docs/api.md](docs/api.md) | /api/v1 接口表、新建任务 multipart 字段 |
 | v1 限制 | [docs/limitations.md](docs/limitations.md) | 当前版本能力边界 |
 | 单任务处理计划 | [docs/plans/README.md](docs/plans/README.md) | 一个 task 从素材到「总结 + 用语库」的完整设计与验收（ST0–ST8） |
+| 前端设计规范 | [docs/design/前端设计规范.md](docs/design/前端设计规范.md) | 所有前端布局、配色、排版、动效与组件改动的唯一权威规则 |
 
 ## 其它文档
 

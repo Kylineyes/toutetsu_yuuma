@@ -1,7 +1,8 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { api } from '../api.js'
+import UiButton from '../components/UiButton.vue'
 
 const router = useRouter()
 const password = ref('')
@@ -16,16 +17,36 @@ async function submit() {
 </script>
 
 <template>
-  <div style="max-width:360px;margin:12vh auto">
-    <div class="card">
-      <h2>登录 · toutetsu_yuuma</h2>
-      <p style="color:#64748b">输入访问口令（即服务端环境变量 PASSWORD）。若服务端未设口令，直接进入即可。</p>
-      <div class="row">
-        <input v-model="password" type="password" placeholder="访问口令" style="flex:1" @keyup.enter="submit" />
-        <button @click="submit">登录</button>
+  <main class="login-page">
+    <section class="login-shell" aria-labelledby="login-title">
+      <div class="login-brand">
+        <span class="brand-mark" aria-hidden="true">TY</span>
+        <div>
+          <p class="brand-name">toutetsu_yuuma</p>
+          <p class="muted">视频阅读工作台</p>
+        </div>
       </div>
-      <p v-if="err" style="color:#b91c1c">{{ err }}</p>
-      <p><a href="/tasks">不登录，直接进入（若未启用口令）</a></p>
-    </div>
-  </div>
+      <div class="card login-card">
+        <p class="eyebrow">欢迎回来</p>
+        <h1 id="login-title">登录工作台</h1>
+        <p class="muted">输入服务端访问口令，继续管理视频阅读任务。</p>
+        <div v-if="err" class="alert" role="alert"><p>{{ err }}</p></div>
+        <form class="login-form" @submit.prevent="submit">
+          <label class="field">
+            <span class="field-label">访问口令</span>
+            <input v-model="password" type="password" autocomplete="current-password" placeholder="输入 PASSWORD" autofocus />
+          </label>
+          <UiButton type="submit">登录</UiButton>
+        </form>
+      </div>
+      <p class="login-footer">
+        服务端未启用口令？<RouterLink to="/tasks">直接进入工作台</RouterLink>
+      </p>
+    </section>
+  </main>
 </template>
+
+<style scoped>
+.login-brand .muted { margin: 2px 0 0; font-size: 12px; }
+.login-card .alert { margin: 16px 0 0; }
+</style>
