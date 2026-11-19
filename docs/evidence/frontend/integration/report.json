@@ -1,0 +1,21 @@
+{
+  "steps": {
+    "redirectedTo": "/login",
+    "tasksUrl": "/tasks",
+    "taskRows": 1,
+    "firstTaskId": "1795111323810421700-11323",
+    "detailUrl": "/tasks/1795111323810421700-11323",
+    "detailHasSummary": 2,
+    "detailSummaryHead": "# it\n- 视频：it.mp4\n- 时长：01:00\n- 任务ID：1795111323810421700-11323\n- 分析时间：2026-11-20 02:02\n## 分析概述\n本视频系统品鉴了一款勃艮第夏布利产区的霞多丽白葡萄酒，",
+    "stageRows": 4,
+    "themeAfterToggle": "dark",
+    "themeAfterReload": "dark",
+    "sessionPersisted": true,
+    "profileRows": 1,
+    "profileText": true,
+    "kbEmptyState": true,
+    "createPageSelectOptions": 2
+  },
+  "consoleErrors": [],
+  "requestFailed": []
+}
